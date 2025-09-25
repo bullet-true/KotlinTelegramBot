@@ -19,7 +19,7 @@ fun main() {
         val userInput = readln()
         when (userInput) {
             "1" -> println("Учить слова")
-            "2" -> println("Статистика")
+            "2" -> showStatistics(dictionary)
             "0" -> break
             else -> println("Введите число 1, 2 или 0")
         }
@@ -42,4 +42,12 @@ fun loadDictionary(): List<Word> {
     }
 
     return dictionary
+}
+
+fun showStatistics(dictionary: List<Word>) {
+    val totalCount = dictionary.size
+    val learnedCount = dictionary.filter { it.correctAnswersCount >= 3 }.size
+    val percent = if (totalCount > 0) (learnedCount * 100 / totalCount) else 0
+
+    println("Выучено $learnedCount из $totalCount слов | $percent%\n")
 }
