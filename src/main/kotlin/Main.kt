@@ -2,6 +2,8 @@ package org.example
 
 import java.io.File
 
+const val MIN_CORRECT_ANSWERS = 3
+
 fun main() {
 
     val dictionary = loadDictionary()
@@ -46,7 +48,7 @@ fun loadDictionary(): List<Word> {
 
 fun showStatistics(dictionary: List<Word>) {
     val totalCount = dictionary.size
-    val learnedCount = dictionary.filter { it.correctAnswersCount >= 3 }.size
+    val learnedCount = dictionary.filter { it.correctAnswersCount >= MIN_CORRECT_ANSWERS }.size
     val percent = if (totalCount > 0) (learnedCount * 100 / totalCount) else 0
 
     println("Выучено $learnedCount из $totalCount слов | $percent%\n")
