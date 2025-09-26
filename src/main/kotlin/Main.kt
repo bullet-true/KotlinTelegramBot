@@ -4,6 +4,7 @@ import java.io.File
 
 const val MIN_CORRECT_ANSWERS = 3
 const val ANSWER_OPTIONS_COUNT = 4
+const val DICTIONARY_FILE = "words.txt"
 
 fun main() {
 
@@ -30,7 +31,7 @@ fun main() {
 }
 
 fun loadDictionary(): List<Word> {
-    val wordsFile = File("words.txt")
+    val wordsFile = File(DICTIONARY_FILE)
     val wordsList = wordsFile.readLines()
     val dictionary = mutableListOf<Word>()
 
@@ -66,6 +67,7 @@ fun startLearning(dictionary: List<Word>) {
 
         val questionWords = notLearnedList.shuffled().take(ANSWER_OPTIONS_COUNT)
         val correctAnswer = questionWords.random()
+        val correctAnswerId = questionWords.indexOf(correctAnswer) + 1
 
         println("\n${correctAnswer.original}:")
 
@@ -73,6 +75,31 @@ fun startLearning(dictionary: List<Word>) {
             println(" ${index + 1} - ${word.translate}")
         }
 
-        val userInput = readln()
+        println(" ----------")
+        println(" 0 - Меню")
+
+        val userAnswerInput = readln().toIntOrNull()
+        when (userAnswerInput) {
+            0 -> break
+
+            in 1..questionWords.size -> {
+                if (userAnswerInput == correctAnswerId) {
+                    println("Правильно!")
+                    correctAnswer.correctAnswersCount++
+                    saveDictionary(dictionary)
+                } else {
+                    println("Неправильно! ${correctAnswer.original} – это ${correctAnswer.translate}")
+                }
+            }
+
+            else -> println("Для ответа нужно ввести число от 0 до ${questionWords.size}")
+        }
     }
+}
+
+fun saveDictionary(dictionary: List<Word>) {
+    val wordsFile = File(DICTIONARY_FILE)
+    wordsFile.writeText(dictionary.joinToString("\n") {
+        "${it.original}|${it.translate}|${it.correctAnswersCount}"
+    })
 }
