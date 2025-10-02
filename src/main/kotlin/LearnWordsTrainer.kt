@@ -49,7 +49,7 @@ class LearnWordsTrainer(
 
     fun getStatistics(): Statistics {
         val totalCount = dictionary.size
-        val learnedCount = dictionary.count { it.correctAnswersCount >= DEFAULT_LEARNED_ANSWER_COUNT }
+        val learnedCount = dictionary.count { it.correctAnswersCount >= learnedAnswerCount }
         val percent = if (totalCount > 0) (learnedCount * 100 / totalCount) else 0
         return Statistics(totalCount, learnedCount, percent)
     }
