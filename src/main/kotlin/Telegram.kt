@@ -18,13 +18,22 @@ fun main(args: Array<String>) {
         val updates = getUpdates(client, botToken, updateId)
         println(updates)
 
-        val startUpdateIdIndex = updates.lastIndexOf("update_id")
-        val endUpdateIdIndex = updates.lastIndexOf(",\n\"message")
+        val updateIdString = Regex("\"update_id\":(\\d+),")
+            .findAll(updates)
+            .lastOrNull()
+            ?.groupValues
+            ?.getOrNull(1)
 
-        if (startUpdateIdIndex == -1 || endUpdateIdIndex == -1) continue
+        updateId = updateIdString?.toInt()?.plus(1) ?: continue
 
-        val updateIdString = updates.substring(startUpdateIdIndex + 11, endUpdateIdIndex)
-        updateId = updateIdString.toInt() + 1
+        println(updateId)
+
+        val messageText = Regex("\"text\":\"(.+?)\"")
+            .find(updates)
+            ?.groupValues
+            ?.getOrNull(1)
+
+        println(messageText)
     }
 }
 
