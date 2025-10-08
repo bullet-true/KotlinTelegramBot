@@ -23,7 +23,8 @@ fun main(args: Array<String>) {
         updateId = updateIdString?.toInt()?.plus(1) ?: continue
 
         val chatId = Regex("\"chat\":\\{\"id\":(\\d+)")
-            .find(updates)
+            .findAll(updates)
+            .lastOrNull()
             ?.groupValues
             ?.getOrNull(1)
             ?.toInt()
@@ -34,6 +35,8 @@ fun main(args: Array<String>) {
             ?.groupValues
             ?.getOrNull(1)
 
-        println(telegramBotService.sendMessage(chatId, messageText))
+        if (chatId != null && messageText != null) {
+            println(telegramBotService.sendMessage(chatId, messageText))
+        }
     }
 }
