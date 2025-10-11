@@ -8,6 +8,7 @@ fun main(args: Array<String>) {
     var updateId = 0
     val client: HttpClient = HttpClient.newBuilder().build()
     val telegramBotService = TelegramBotService(botToken, client)
+    val trainer = LearnWordsTrainer()
 
     val updateIdRegex = "\"update_id\":(\\d+),".toRegex()
     val messageTextRegex = "\"text\":\"(.+?)\"".toRegex()
@@ -32,7 +33,7 @@ fun main(args: Array<String>) {
             .lastOrNull()
             ?.groupValues
             ?.getOrNull(1)
-            ?.toInt()
+            ?.toInt() ?: continue
 
         val message = messageTextRegex
             .findAll(updates)
@@ -46,15 +47,11 @@ fun main(args: Array<String>) {
             ?.groupValues
             ?.getOrNull(1)
 
-//        if (chatId != null && message != null) {
-//            telegramBotService.sendMessage(chatId, message)
-//        }
-
-        if (chatId != null && message?.lowercase() == "/start") {
+        if (message?.lowercase() == "/start") {
             telegramBotService.sendMenu(chatId)
         }
 
-        if (chatId != null && data?.lowercase() == "statistics_clicked") {
+        if (data?.lowercase() == "statistics_clicked") {
             telegramBotService.sendMessage(chatId, "Выучено 10 из 10 слов | 100%")
         }
     }
