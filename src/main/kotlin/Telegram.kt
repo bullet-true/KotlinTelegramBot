@@ -8,13 +8,19 @@ fun main(args: Array<String>) {
     var updateId = 0
     val client: HttpClient = HttpClient.newBuilder().build()
     val telegramBotService = TelegramBotService(botToken, client)
+    val trainer = LearnWordsTrainer()
+
+    val updateIdRegex = "\"update_id\":(\\d+),".toRegex()
+    val messageTextRegex = "\"text\":\"(.+?)\"".toRegex()
+    val chatIdRegex = "\"chat\":\\{\"id\":(\\d+)".toRegex()
+    val dataRegex = "\"data\":\"(.+?)\"".toRegex()
 
     while (true) {
         Thread.sleep(2000)
         val updates = telegramBotService.getUpdates(updateId)
         println(updates)
 
-        val updateIdString = Regex("\"update_id\":(\\d+),")
+        val updateIdString = updateIdRegex
             .findAll(updates)
             .lastOrNull()
             ?.groupValues
@@ -22,21 +28,31 @@ fun main(args: Array<String>) {
 
         updateId = updateIdString?.toInt()?.plus(1) ?: continue
 
-        val chatId = Regex("\"chat\":\\{\"id\":(\\d+)")
+        val chatId = chatIdRegex
             .findAll(updates)
             .lastOrNull()
             ?.groupValues
             ?.getOrNull(1)
-            ?.toInt()
+            ?.toInt() ?: continue
 
-        val messageText = Regex("\"text\":\"(.+?)\"")
+        val message = messageTextRegex
             .findAll(updates)
             .lastOrNull()
             ?.groupValues
             ?.getOrNull(1)
 
-        if (chatId != null && messageText != null) {
-            println(telegramBotService.sendMessage(chatId, messageText))
+        val data = dataRegex
+            .findAll(updates)
+            .lastOrNull()
+            ?.groupValues
+            ?.getOrNull(1)
+
+        if (message?.lowercase() == "/start") {
+            telegramBotService.sendMenu(chatId)
+        }
+
+        if (data?.lowercase() == "statistics_clicked") {
+            telegramBotService.sendMessage(chatId, "Выучено 10 из 10 слов | 100%")
         }
     }
 }

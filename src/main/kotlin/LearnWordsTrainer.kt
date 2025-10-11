@@ -89,3 +89,20 @@ class LearnWordsTrainer(
         })
     }
 }
+
+data class Word(
+    val original: String,
+    val translate: String,
+    var correctAnswersCount: Int = 0,
+)
+
+data class Question(
+    val variants: List<Word>,
+    val correctAnswer: Word,
+)
+
+data class Statistics(
+    val totalCount: Int,
+    val learnedCount: Int,
+    val percent: Int,
+)
