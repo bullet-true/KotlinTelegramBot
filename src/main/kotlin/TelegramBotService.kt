@@ -106,14 +106,13 @@ class TelegramBotService(private val botToken: String, private val client: HttpC
 
     fun checkNextQuestionAndSend(
         trainer: LearnWordsTrainer,
-        telegramBotService: TelegramBotService,
         chatId: Int
     ) {
         val nextQuestion = trainer.getNextQuestion()
         if (nextQuestion == null) {
-            telegramBotService.sendMessage(chatId, "Все слова в словаре выучены")
+            sendMessage(chatId, "Все слова в словаре выучены")
         } else {
-            telegramBotService.sendQuestion(chatId, nextQuestion)
+            sendQuestion(chatId, nextQuestion)
         }
     }
 }

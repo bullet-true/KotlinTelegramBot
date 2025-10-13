@@ -60,7 +60,7 @@ fun main(args: Array<String>) {
         }
 
         if (data == LEARN_WORDS_CALLBACK) {
-            telegramBotService.checkNextQuestionAndSend(trainer, telegramBotService, chatId)
+            telegramBotService.checkNextQuestionAndSend(trainer, chatId)
         }
     }
 }
