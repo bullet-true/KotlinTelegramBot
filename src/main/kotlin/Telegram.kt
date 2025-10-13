@@ -47,12 +47,16 @@ fun main(args: Array<String>) {
             ?.groupValues
             ?.getOrNull(1)
 
-        if (message?.lowercase() == "/start") {
+        if (message?.lowercase() == COMMAND_START) {
             telegramBotService.sendMenu(chatId)
         }
 
-        if (data?.lowercase() == "statistics_clicked") {
-            telegramBotService.sendMessage(chatId, "Выучено 10 из 10 слов | 100%")
+        if (data?.lowercase() == STATISTICS_CALLBACK) {
+            val statistics = trainer.getStatistics()
+            telegramBotService.sendMessage(
+                chatId = chatId,
+                message = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
+            )
         }
     }
 }

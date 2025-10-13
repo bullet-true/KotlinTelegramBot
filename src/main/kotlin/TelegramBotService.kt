@@ -11,6 +11,7 @@ const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
 const val EXIT_CALLBACK = "exit_clicked"
+const val COMMAND_START = "/start"
 
 class TelegramBotService(private val botToken: String, private val client: HttpClient) {
 
@@ -66,7 +67,7 @@ class TelegramBotService(private val botToken: String, private val client: HttpC
 
         val request: HttpRequest = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .header("content-type", "application/json")
+            .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(sendMenuBody))
             .build()
 
