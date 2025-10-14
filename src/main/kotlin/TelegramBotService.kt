@@ -12,6 +12,7 @@ const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
 const val EXIT_CALLBACK = "exit_clicked"
 const val COMMAND_START = "/start"
+const val CALLBACK_DATA_ANSWER_PREFIX = "answer_"
 
 class TelegramBotService(private val botToken: String, private val client: HttpClient) {
 
@@ -73,5 +74,45 @@ class TelegramBotService(private val botToken: String, private val client: HttpC
 
         val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
         return response.body()
+    }
+
+    private fun sendQuestion(chatId: Int, question: Question): String {
+        val buttons = question.variants.mapIndexed { index, word ->
+            "[{\"text\":\"${word.translate}\",\"callback_data\":\"${CALLBACK_DATA_ANSWER_PREFIX}${index}\"}]"
+        }.joinToString(",")
+
+        val sendQuestinBody = """
+        {
+            "chat_id": $chatId,
+            "text": "${question.correctAnswer.original}",
+            "reply_markup": {
+                "inline_keyboard": [
+                    $buttons
+                ]
+            }
+        }
+        """.trimIndent()
+
+        val url = "$TELEGRAM_BASE_URL$botToken/sendMessage"
+        val request: HttpRequest = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(sendQuestinBody))
+            .build()
+
+        val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
+        return response.body()
+    }
+
+    fun checkNextQuestionAndSend(
+        trainer: LearnWordsTrainer,
+        chatId: Int
+    ) {
+        val nextQuestion = trainer.getNextQuestion()
+        if (nextQuestion == null) {
+            sendMessage(chatId, "Все слова в словаре выучены")
+        } else {
+            sendQuestion(chatId, nextQuestion)
+        }
     }
 }
