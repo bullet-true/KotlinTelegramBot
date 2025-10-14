@@ -62,5 +62,9 @@ fun main(args: Array<String>) {
         if (data == LEARN_WORDS_CALLBACK) {
             telegramBotService.checkNextQuestionAndSend(trainer, chatId)
         }
+
+        data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
+            telegramBotService.checkAnswerAndSend(trainer, chatId, it)
+        }
     }
 }

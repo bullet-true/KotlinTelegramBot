@@ -54,6 +54,8 @@ class LearnWordsTrainer(
         return Statistics(totalCount, learnedCount, percent)
     }
 
+    fun getCurrentQuestion(): Question? = question
+
     private fun loadDictionary(): List<Word> {
         try {
             val wordsFile = File(DICTIONARY_FILE)
