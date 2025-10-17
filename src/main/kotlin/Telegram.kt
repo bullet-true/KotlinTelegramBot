@@ -20,7 +20,7 @@ fun main(args: Array<String>) {
         val responseString = telegramBotService.getUpdates(updateId)
         println(responseString)
 
-        val response: Response = json.decodeFromString(responseString)
+        val response: Response = json.decodeFromString<Response>(responseString)
         val lastUpdate = response.result.lastOrNull() ?: continue
         updateId = lastUpdate.updateId + 1
 

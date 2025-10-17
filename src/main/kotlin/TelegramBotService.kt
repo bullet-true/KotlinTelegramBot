@@ -32,7 +32,7 @@ class TelegramBotService(
 
     fun sendMessage(chatId: Long, message: String): String {
         val requestBody = SendMessageRequest(chatId, message)
-        val requestBodyString = json.encodeToString(requestBody)
+        val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
         return postJson(sendMessageUrl, requestBodyString)
     }
 
@@ -49,7 +49,7 @@ class TelegramBotService(
                 )
             )
         )
-        val requestBodyString = json.encodeToString(requestBody)
+        val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
         return postJson(sendMessageUrl, requestBodyString)
     }
 
@@ -93,7 +93,7 @@ class TelegramBotService(
                 }
             )
         )
-        val requestBodyString = json.encodeToString(requestBody)
+        val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
         return postJson(sendMessageUrl, requestBodyString)
     }
 
