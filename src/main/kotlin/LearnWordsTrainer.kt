@@ -7,6 +7,7 @@ const val DEFAULT_COUNT_OF_QUESTION_WORDS = 4
 const val DICTIONARY_FILE = "words.txt"
 
 class LearnWordsTrainer(
+    private val filename: String = DICTIONARY_FILE,
     private val learnedAnswerCount: Int = DEFAULT_LEARNED_ANSWER_COUNT,
     private val countOfQuestionWords: Int = DEFAULT_COUNT_OF_QUESTION_WORDS,
 ) {
@@ -39,7 +40,7 @@ class LearnWordsTrainer(
             val correctAnswerIndex = it.variants.indexOf(it.correctAnswer)
             if (userAnswerInput == correctAnswerIndex) {
                 it.correctAnswer.correctAnswersCount++
-                saveDictionary(dictionary)
+                saveDictionary()
                 true
             } else {
                 false
@@ -56,16 +57,21 @@ class LearnWordsTrainer(
 
     fun getCurrentQuestion(): Question? = question
 
+    fun resetProgress() {
+        dictionary.forEach { it.correctAnswersCount = 0 }
+        saveDictionary()
+    }
+
     private fun loadDictionary(): List<Word> {
         try {
-            val wordsFile = File(DICTIONARY_FILE)
+            val wordsFile = File(filename)
             if (!wordsFile.exists()) {
-                throw IllegalStateException("Файл словаря не найден: $DICTIONARY_FILE")
+                File(DICTIONARY_FILE).copyTo(wordsFile)
             }
 
             val wordsList = wordsFile.readLines()
             if (wordsList.isEmpty()) {
-                throw IllegalStateException("Файл словаря пустой: $DICTIONARY_FILE")
+                throw IllegalStateException("Файл словаря пустой: $filename")
             }
 
             val dictionary = mutableListOf<Word>()
@@ -80,12 +86,12 @@ class LearnWordsTrainer(
             }
             return dictionary
         } catch (e: IndexOutOfBoundsException) {
-            throw IllegalStateException("Некорректное содержание файла словаря $DICTIONARY_FILE. $e")
+            throw IllegalStateException("Некорректное содержание файла словаря $filename. $e")
         }
     }
 
-    private fun saveDictionary(dictionary: List<Word>) {
-        val wordsFile = File(DICTIONARY_FILE)
+    private fun saveDictionary() {
+        val wordsFile = File(filename)
         wordsFile.writeText(dictionary.joinToString("\n") {
             "${it.original}|${it.translate}|${it.correctAnswersCount}"
         })

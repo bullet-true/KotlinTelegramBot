@@ -9,6 +9,7 @@ import java.net.http.HttpResponse
 const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
+const val RESET_CLICKED = "reset_clicked"
 const val COMMAND_START = "/start"
 const val CALLBACK_DATA_ANSWER_PREFIX = "answer_"
 const val DELAY_MS = 2000L
@@ -44,7 +45,10 @@ class TelegramBotService(
                 listOf(
                     listOf(
                         InlineKeyboard(text = "Изучить слова", callbackData = LEARN_WORDS_CALLBACK),
-                        InlineKeyboard(text = "Статистика", callbackData = STATISTICS_CALLBACK)
+                        InlineKeyboard(text = "Статистика", callbackData = STATISTICS_CALLBACK),
+                    ),
+                    listOf(
+                        InlineKeyboard(text = "Сбросить прогресс", callbackData = RESET_CLICKED),
                     )
                 )
             )

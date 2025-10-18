@@ -10,8 +10,8 @@ fun main(args: Array<String>) {
     val botToken = args[0]
     val client: HttpClient = HttpClient.newBuilder().build()
     val json = Json { ignoreUnknownKeys = true }
+    val trainers = HashMap<Long, LearnWordsTrainer>()
     val telegramBotService = TelegramBotService(botToken, client, json)
-    val trainer = LearnWordsTrainer()
     var updateId = 0L
 
     while (true) {
@@ -24,32 +24,43 @@ fun main(args: Array<String>) {
         val lastUpdate = response.result.lastOrNull() ?: continue
         updateId = lastUpdate.updateId + 1
 
-        val chatId = lastUpdate.message?.chat?.id
-            ?: lastUpdate.callbackQuery?.message?.chat?.id
-            ?: continue
+        handleUpdate(lastUpdate, trainers, telegramBotService)
+    }
+}
 
-        val message = lastUpdate.message?.text
-        val data = lastUpdate.callbackQuery?.data
+fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, botService: TelegramBotService) {
+    val chatId = update.message?.chat?.id
+        ?: update.callbackQuery?.message?.chat?.id
+        ?: return
 
-        if (message == COMMAND_START) {
-            telegramBotService.sendMenu(chatId)
-        }
+    val message = update.message?.text
+    val data = update.callbackQuery?.data
 
-        if (data == STATISTICS_CALLBACK) {
-            val statistics = trainer.getStatistics()
-            telegramBotService.sendMessage(
-                chatId = chatId,
-                message = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
-            )
-        }
+    val trainer = trainers.getOrPut(chatId) { LearnWordsTrainer("$chatId.txt") }
 
-        if (data == LEARN_WORDS_CALLBACK) {
-            telegramBotService.checkNextQuestionAndSend(trainer, chatId)
-        }
+    if (message == COMMAND_START) {
+        botService.sendMenu(chatId)
+    }
 
-        data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
-            telegramBotService.checkAnswerAndSend(trainer, chatId, it)
-        }
+    if (data == STATISTICS_CALLBACK) {
+        val statistics = trainer.getStatistics()
+        botService.sendMessage(
+            chatId = chatId,
+            message = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
+        )
+    }
+
+    if (data == LEARN_WORDS_CALLBACK) {
+        botService.checkNextQuestionAndSend(trainer, chatId)
+    }
+
+    data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
+        botService.checkAnswerAndSend(trainer, chatId, it)
+    }
+
+    if (data == RESET_CLICKED) {
+        trainer.resetProgress()
+        botService.sendMessage(chatId, "Прогресс сброшен")
     }
 }
 
