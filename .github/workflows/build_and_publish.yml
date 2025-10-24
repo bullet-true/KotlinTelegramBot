@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - KTB-24-github-deploy
 
 jobs:
   build:
