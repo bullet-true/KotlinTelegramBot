@@ -36,7 +36,9 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     val message = update.message?.text
     val data = update.callbackQuery?.data
 
-    val trainer = trainers.getOrPut(chatId) { LearnWordsTrainer("$chatId.txt") }
+    val trainer = trainers.getOrPut(chatId) {
+        LearnWordsTrainer(DatabaseUserDictionary(chatId))
+    }
 
     if (message == COMMAND_START) {
         botService.sendMenu(chatId)

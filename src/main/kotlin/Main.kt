@@ -1,11 +1,11 @@
 package org.example
 
 fun main() {
-
+    val chatId = 0L
     val trainer = try {
-        LearnWordsTrainer()
+        LearnWordsTrainer(DatabaseUserDictionary(chatId))
     } catch (e: Exception) {
-        println("Невозможно загрузить словарь. $e")
+        println("Невозможно подключиться к БД. $e")
         return
     }
 
