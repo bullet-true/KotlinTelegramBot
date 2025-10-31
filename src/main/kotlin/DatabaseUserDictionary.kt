@@ -1,8 +1,6 @@
 package org.example
 
-import java.io.Closeable
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.ResultSet
 
 const val DATABASE_NAME = "data.db"
@@ -11,37 +9,9 @@ const val DEFAULT_LEARNING_THRESHOLD = 3
 class DatabaseUserDictionary(
     private val chatId: Long,
     private val learningThreshold: Int = DEFAULT_LEARNING_THRESHOLD
-) : IUserDictionary, Closeable {
-    private val connection: Connection = DriverManager.getConnection("jdbc:sqlite:$DATABASE_NAME")
+) : IUserDictionary {
 
-    init {
-        connection.createStatement().use { statement ->
-            statement.executeUpdate(
-                """
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        chat_id INTEGER UNIQUE
-                    );
-                """.trimIndent()
-            )
-
-            statement.executeUpdate(
-                """
-                        CREATE TABLE IF NOT EXISTS user_answers (
-                        user_id INTEGER,
-                        word_id INTEGER,
-                        correct_answer_count INTEGER,
-                        updated_at TIMESTAMP,
-                        FOREIGN KEY(user_id) REFERENCES users(id),
-                        FOREIGN KEY(word_id) REFERENCES words(id),
-                        UNIQUE(user_id, word_id)
-                    );
-                """.trimIndent()
-            )
-        }
-    }
+    private val connection: Connection = DatabaseConnection.connection
 
     private fun getUserId(): Int {
         connection.prepareStatement(
@@ -180,9 +150,5 @@ class DatabaseUserDictionary(
             ps.setInt(1, userId)
             ps.executeUpdate()
         }
-    }
-
-    override fun close() {
-        connection.close()
     }
 }

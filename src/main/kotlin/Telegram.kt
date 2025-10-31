@@ -14,6 +14,10 @@ fun main(args: Array<String>) {
     val telegramBotService = TelegramBotService(botToken, client, json)
     var updateId = 0L
 
+    Runtime.getRuntime().addShutdownHook(Thread {
+        DatabaseConnection.close()
+    })
+
     while (true) {
         Thread.sleep(DELAY_MS)
 
