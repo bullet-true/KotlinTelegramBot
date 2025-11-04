@@ -26,5 +26,5 @@ kotlin {
 }
 
 application {
-    mainClass.set("org.example.TelegramKt")
+    mainClass.set("ru.ifedorov.telegrambot.telegram.TelegramKt")
 }

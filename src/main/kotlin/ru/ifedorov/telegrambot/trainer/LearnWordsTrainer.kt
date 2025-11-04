@@ -1,4 +1,7 @@
-package org.example
+package ru.ifedorov.telegrambot.trainer
+
+import ru.ifedorov.telegrambot.trainer.model.Question
+import ru.ifedorov.telegrambot.trainer.model.Statistics
 
 const val DEFAULT_ANSWER_OPTIONS_COUNT = 4
 
@@ -55,20 +58,3 @@ class LearnWordsTrainer(
         dictionary.resetUserProgress()
     }
 }
-
-data class Word(
-    val original: String,
-    val translate: String,
-    var correctAnswersCount: Int = 0,
-)
-
-data class Question(
-    val variants: List<Word>,
-    val correctAnswer: Word,
-)
-
-data class Statistics(
-    val totalCount: Int,
-    val learnedCount: Int,
-    val percent: Int,
-)

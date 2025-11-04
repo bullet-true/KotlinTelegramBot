@@ -1,5 +1,11 @@
-package org.example
+package ru.ifedorov.telegrambot.telegram.service
 
+import ru.ifedorov.telegrambot.telegram.service.entity.InlineKeyboard
+import ru.ifedorov.telegrambot.telegram.service.entity.ReplyMarkup
+import ru.ifedorov.telegrambot.telegram.service.entity.Response
+import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageRequest
+import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
+import ru.ifedorov.telegrambot.trainer.model.Question
 import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -9,26 +15,36 @@ import java.net.http.HttpResponse
 const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
+const val MENU_CALLBACK = "menu_clicked"
 const val RESET_CLICKED = "reset_clicked"
 const val COMMAND_START = "/start"
 const val CALLBACK_DATA_ANSWER_PREFIX = "answer_"
 const val DELAY_MS = 2000L
 
 class TelegramBotService(
-    private val botToken: String,
-    private val client: HttpClient,
-    private val json: Json,
+    private val botToken: String
 ) {
+    val client: HttpClient = HttpClient.newBuilder().build()
+    val json = Json { ignoreUnknownKeys = true }
     private val sendMessageUrl = "$TELEGRAM_BASE_URL$botToken/sendMessage"
 
-    fun getUpdates(updateId: Long): String {
+    fun getUpdates(updateId: Long): Response? {
         val url = "$TELEGRAM_BASE_URL$botToken/getUpdates?offset=$updateId"
         val request: HttpRequest = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .build()
 
-        val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
-        return response.body()
+        val result = runCatching {
+            val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val responseString = response.body()
+            json.decodeFromString<Response>(responseString)
+        }
+
+        if (result.isFailure) {
+            println(result.exceptionOrNull()?.localizedMessage ?: "Some error")
+        }
+
+        return result.getOrNull()
     }
 
     fun sendMessage(chatId: Long, message: String): String {
@@ -83,19 +99,28 @@ class TelegramBotService(
     }
 
     private fun sendQuestion(chatId: Long, question: Question): String {
+        val answerButtons = question.variants.mapIndexed { index, word ->
+            listOf(
+                InlineKeyboard(
+                    text = word.translate,
+                    callbackData = "$CALLBACK_DATA_ANSWER_PREFIX$index"
+                )
+            )
+        }
+
+        val menuButton = listOf(
+            listOf(
+                InlineKeyboard(
+                    text = "Выйти в меню",
+                    callbackData = MENU_CALLBACK
+                )
+            )
+        )
+
         val requestBody = SendMessageRequest(
             chatId = chatId,
             text = question.correctAnswer.original,
-            replyMarkup = ReplyMarkup(
-                question.variants.mapIndexed { index, word ->
-                    listOf(
-                        InlineKeyboard(
-                            text = word.translate,
-                            callbackData = "$CALLBACK_DATA_ANSWER_PREFIX$index"
-                        )
-                    )
-                }
-            )
+            replyMarkup = ReplyMarkup(answerButtons + menuButton)
         )
         val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
         return postJson(sendMessageUrl, requestBodyString)

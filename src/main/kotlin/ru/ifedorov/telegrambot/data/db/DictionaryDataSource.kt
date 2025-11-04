@@ -1,4 +1,4 @@
-package org.example
+package ru.ifedorov.telegrambot.data.db
 
 import java.io.File
 

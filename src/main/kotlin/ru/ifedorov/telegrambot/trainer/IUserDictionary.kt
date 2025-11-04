@@ -1,4 +1,6 @@
-package org.example
+package ru.ifedorov.telegrambot.trainer
+
+import ru.ifedorov.telegrambot.trainer.model.Word
 
 interface IUserDictionary {
     fun getNumOfLearnedWords(): Int

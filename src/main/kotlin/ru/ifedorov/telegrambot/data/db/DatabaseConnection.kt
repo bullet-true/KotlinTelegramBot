@@ -1,10 +1,12 @@
-package org.example
+package ru.ifedorov.telegrambot.data.db
 
 import java.sql.Connection
 import java.sql.DriverManager
 
+const val DATABASE_NAME = "data.db"
+
 object DatabaseConnection {
-    val connection: Connection = DriverManager.getConnection("jdbc:sqlite:$DATABASE_NAME").apply {
+    val connection: Connection = DriverManager.getConnection("jdbc:sqlite:${DATABASE_NAME}").apply {
         createStatement().use { statement ->
             statement.execute("PRAGMA journal_mode=WAL;")
             statement.execute("PRAGMA foreign_keys=ON;")

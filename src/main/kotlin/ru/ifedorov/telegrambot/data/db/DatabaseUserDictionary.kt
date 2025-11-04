@@ -1,9 +1,10 @@
-package org.example
+package ru.ifedorov.telegrambot.data.db
 
+import ru.ifedorov.telegrambot.trainer.IUserDictionary
+import ru.ifedorov.telegrambot.trainer.model.Word
 import java.sql.Connection
 import java.sql.ResultSet
 
-const val DATABASE_NAME = "data.db"
 const val DEFAULT_LEARNING_THRESHOLD = 3
 
 class DatabaseUserDictionary(

@@ -1,4 +1,8 @@
-package org.example
+package ru.ifedorov.telegrambot.console
+
+import ru.ifedorov.telegrambot.data.db.DatabaseConnection
+import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
+import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 
 fun main() {
     val chatId = 0L
@@ -55,11 +59,4 @@ fun main() {
             else -> println("Введите число 1, 2 или 0")
         }
     }
-}
-
-fun Question.asConsoleString(): String {
-    val variants = this.variants
-        .mapIndexed { index, word -> " ${index + 1} - ${word.translate}" }
-        .joinToString(separator = "\n")
-    return "\n" + this.correctAnswer.original + ":" + "\n" + variants + "\n ---------- \n 0 - Меню"
 }

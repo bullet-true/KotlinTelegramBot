@@ -1,5 +1,8 @@
-package org.example
+package ru.ifedorov.telegrambot.data
 
+import ru.ifedorov.telegrambot.data.db.DEFAULT_LEARNING_THRESHOLD
+import ru.ifedorov.telegrambot.trainer.IUserDictionary
+import ru.ifedorov.telegrambot.trainer.model.Word
 import java.io.File
 
 const val DICTIONARY_FILE = "words.txt"
