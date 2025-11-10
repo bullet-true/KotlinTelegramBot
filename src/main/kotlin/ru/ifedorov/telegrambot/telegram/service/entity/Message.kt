@@ -9,4 +9,8 @@ data class Message(
     val text: String? = null,
     @SerialName("chat")
     val chat: Chat,
+    @SerialName("from")
+    val from: From,
+    @SerialName("document")
+    val document: Document? = null
 )

@@ -3,6 +3,7 @@ package ru.ifedorov.telegrambot.telegram
 import ru.ifedorov.telegrambot.data.db.DatabaseConnection
 import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
 import ru.ifedorov.telegrambot.telegram.service.*
+import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
 import ru.ifedorov.telegrambot.telegram.service.entity.Update
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 
@@ -34,11 +35,13 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
         ?: update.callbackQuery?.message?.chat?.id
         ?: return
 
+    val username = update.message?.from?.username ?: ""
     val message = update.message?.text
     val data = update.callbackQuery?.data
+    val document = update.message?.document
 
     val trainer = trainers.getOrPut(chatId) {
-        LearnWordsTrainer(DatabaseUserDictionary(chatId))
+        LearnWordsTrainer(DatabaseUserDictionary(chatId, username))
     }
 
     if (message == COMMAND_START || data == MENU_CALLBACK) {
@@ -64,5 +67,20 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     if (data == RESET_CLICKED) {
         trainer.resetProgress()
         botService.sendMessage(chatId, "Прогресс сброшен")
+    }
+
+    document?.let { document ->
+        val fileInfoResponse: GetFileResponse? = botService.getFileInfoFromTelegram(document.fileId)
+
+        if (fileInfoResponse?.ok == true && fileInfoResponse.result != null) {
+            val filePath = fileInfoResponse.result.filePath
+            val fileName = document.fileName
+
+            botService.saveTelegramFileLocally(filePath, fileName)
+            botService.sendMessage(chatId, "Файл $fileName успешно загружен на сервер")
+
+        } else {
+            botService.sendMessage(chatId, "Ошибка при загрузки файла на сервер")
+        }
     }
 }

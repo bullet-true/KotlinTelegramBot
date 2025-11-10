@@ -10,6 +10,7 @@ const val DEFAULT_LEARNING_THRESHOLD = 3
 
 class DatabaseUserDictionary(
     private val chatId: Long,
+    private val username: String,
     private val learningThreshold: Int = DEFAULT_LEARNING_THRESHOLD
 ) : IUserDictionary {
 
@@ -68,12 +69,13 @@ class DatabaseUserDictionary(
     private fun getUserId(): Int {
         connection.prepareStatement(
             """
-                    INSERT INTO users (chat_id, created_at) 
-                    VALUES (?, CURRENT_TIMESTAMP) 
+                    INSERT INTO users (username, chat_id, created_at) 
+                    VALUES (?, ?, CURRENT_TIMESTAMP) 
                     ON CONFLICT(chat_id) DO NOTHING
                 """.trimIndent()
         ).use { ps ->
-            ps.setLong(1, chatId)
+            ps.setString(1, username)
+            ps.setLong(2, chatId)
             ps.executeUpdate()
         }
 

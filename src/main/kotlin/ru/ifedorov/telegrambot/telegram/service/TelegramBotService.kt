@@ -7,12 +7,17 @@ import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageRequest
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import ru.ifedorov.telegrambot.trainer.model.Question
 import kotlinx.serialization.json.Json
+import ru.ifedorov.telegrambot.telegram.service.entity.GetFileRequest
+import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
+import java.io.File
+import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
+const val BOT_FILE_URL = "https://api.telegram.org/file/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
 const val MENU_CALLBACK = "menu_clicked"
@@ -45,6 +50,53 @@ class TelegramBotService(
         }
 
         return result.getOrNull()
+    }
+
+    fun getFileInfoFromTelegram(fileId: String): GetFileResponse? {
+        val url = "$TELEGRAM_BASE_URL$botToken/getFile"
+        val requestBody = GetFileRequest(fileId = fileId)
+        val requestBodyString = json.encodeToString<GetFileRequest>(requestBody)
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBodyString))
+            .build()
+
+        val result = runCatching {
+            val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val responseString = response.body()
+            json.decodeFromString<GetFileResponse>(responseString)
+        }
+
+        if (result.isFailure) {
+            println(result.exceptionOrNull()?.localizedMessage ?: "Ошибка в getFileInfoFromTelegram()")
+        }
+
+        return result.getOrNull()
+    }
+
+    fun saveTelegramFileLocally(filePath: String, fileName: String) {
+        val url = "$BOT_FILE_URL$botToken/$filePath"
+        println(url)
+        val request: HttpRequest = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .build()
+
+        runCatching {
+            val response: HttpResponse<InputStream> = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
+            println("Status code: ${response.statusCode()}")
+
+            val body: InputStream = response.body()
+            body.copyTo(File(fileName).outputStream(), 16 * 1024)
+        }
+            .onSuccess {
+                println("Файл $fileName успешно сохранен")
+            }
+            .onFailure { e ->
+                println("Ошибка при сохранении файла: ${e.message}")
+                e.printStackTrace()
+            }
     }
 
     fun sendMessage(chatId: Long, message: String): String {
