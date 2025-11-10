@@ -2,6 +2,7 @@ package ru.ifedorov.telegrambot.data.db
 
 import ru.ifedorov.telegrambot.trainer.IUserDictionary
 import ru.ifedorov.telegrambot.trainer.model.Word
+import java.lang.Exception
 import java.sql.Connection
 import java.sql.ResultSet
 
@@ -13,6 +14,56 @@ class DatabaseUserDictionary(
 ) : IUserDictionary {
 
     private val connection: Connection = DatabaseConnection.connection
+    private val dictionaryDataSource = DictionaryDataSource()
+
+    init {
+        createTablesIfNotExists()
+
+        try {
+            dictionaryDataSource.updateDictionary()
+        } catch (e: Exception) {
+            println("Ошибка загрузки словаря. ${e.message}")
+        }
+    }
+
+    private fun createTablesIfNotExists() {
+        DatabaseConnection.connection.createStatement().use { statement ->
+            statement.executeUpdate(
+                """
+                    CREATE TABLE IF NOT EXISTS words (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        text TEXT UNIQUE,
+                        translate TEXT
+                    );
+                """.trimIndent()
+            )
+
+            statement.executeUpdate(
+                """
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        chat_id INTEGER UNIQUE
+                    );
+                """.trimIndent()
+            )
+
+            statement.executeUpdate(
+                """
+                        CREATE TABLE IF NOT EXISTS user_answers (
+                        user_id INTEGER,
+                        word_id INTEGER,
+                        correct_answer_count INTEGER,
+                        updated_at TIMESTAMP,
+                        FOREIGN KEY(user_id) REFERENCES users(id),
+                        FOREIGN KEY(word_id) REFERENCES words(id),
+                        UNIQUE(user_id, word_id)
+                    );
+                """.trimIndent()
+            )
+        }
+    }
 
     private fun getUserId(): Int {
         connection.prepareStatement(
