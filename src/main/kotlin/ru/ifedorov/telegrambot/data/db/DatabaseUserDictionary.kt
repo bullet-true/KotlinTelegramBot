@@ -2,6 +2,7 @@ package ru.ifedorov.telegrambot.data.db
 
 import ru.ifedorov.telegrambot.trainer.IUserDictionary
 import ru.ifedorov.telegrambot.trainer.model.Word
+import java.io.File
 import java.sql.Connection
 import java.sql.ResultSet
 
@@ -9,20 +10,76 @@ const val DEFAULT_LEARNING_THRESHOLD = 3
 
 class DatabaseUserDictionary(
     private val chatId: Long,
+    private val username: String,
     private val learningThreshold: Int = DEFAULT_LEARNING_THRESHOLD
 ) : IUserDictionary {
 
     private val connection: Connection = DatabaseConnection.connection
+    private val dictionaryDataSource = DictionaryDataSource()
+
+    init {
+        createTablesIfNotExists()
+
+        try {
+            dictionaryDataSource.updateDictionary()
+        } catch (e: Exception) {
+            println("Ошибка загрузки словаря. ${e.message}")
+        }
+    }
+
+    fun updateDictionaryFromFile(file: File) {
+        dictionaryDataSource.updateDictionary(file)
+    }
+
+    private fun createTablesIfNotExists() {
+        DatabaseConnection.connection.createStatement().use { statement ->
+            statement.executeUpdate(
+                """
+                    CREATE TABLE IF NOT EXISTS words (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        text TEXT UNIQUE,
+                        translate TEXT
+                    );
+                """.trimIndent()
+            )
+
+            statement.executeUpdate(
+                """
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        chat_id INTEGER UNIQUE
+                    );
+                """.trimIndent()
+            )
+
+            statement.executeUpdate(
+                """
+                        CREATE TABLE IF NOT EXISTS user_answers (
+                        user_id INTEGER,
+                        word_id INTEGER,
+                        correct_answer_count INTEGER,
+                        updated_at TIMESTAMP,
+                        FOREIGN KEY(user_id) REFERENCES users(id),
+                        FOREIGN KEY(word_id) REFERENCES words(id),
+                        UNIQUE(user_id, word_id)
+                    );
+                """.trimIndent()
+            )
+        }
+    }
 
     private fun getUserId(): Int {
         connection.prepareStatement(
             """
-                    INSERT INTO users (chat_id, created_at) 
-                    VALUES (?, CURRENT_TIMESTAMP) 
+                    INSERT INTO users (username, chat_id, created_at) 
+                    VALUES (?, ?, CURRENT_TIMESTAMP) 
                     ON CONFLICT(chat_id) DO NOTHING
                 """.trimIndent()
         ).use { ps ->
-            ps.setLong(1, chatId)
+            ps.setString(1, username)
+            ps.setLong(2, chatId)
             ps.executeUpdate()
         }
 
@@ -83,7 +140,6 @@ class DatabaseUserDictionary(
         }
         return learnedWords
     }
-
 
     override fun getUnlearnedWords(): List<Word> {
         val userId = getUserId()

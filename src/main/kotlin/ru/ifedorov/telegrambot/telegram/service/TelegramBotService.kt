@@ -1,20 +1,21 @@
 package ru.ifedorov.telegrambot.telegram.service
 
-import ru.ifedorov.telegrambot.telegram.service.entity.InlineKeyboard
-import ru.ifedorov.telegrambot.telegram.service.entity.ReplyMarkup
-import ru.ifedorov.telegrambot.telegram.service.entity.Response
-import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageRequest
+import kotlinx.serialization.json.Json
+import ru.ifedorov.telegrambot.telegram.service.entity.*
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import ru.ifedorov.telegrambot.trainer.model.Question
-import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
+const val BOT_FILE_URL = "https://api.telegram.org/file/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
+const val LOAD_NEW_WORDS_CALLBACK = "load_new_words_clicked"
 const val MENU_CALLBACK = "menu_clicked"
 const val RESET_CLICKED = "reset_clicked"
 const val COMMAND_START = "/start"
@@ -47,6 +48,60 @@ class TelegramBotService(
         return result.getOrNull()
     }
 
+    fun getFileInfoFromTelegram(fileId: String): GetFileResponse? {
+        val url = "$TELEGRAM_BASE_URL$botToken/getFile"
+        val requestBody = GetFileRequest(fileId = fileId)
+        val requestBodyString = json.encodeToString<GetFileRequest>(requestBody)
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBodyString))
+            .build()
+
+        val result = runCatching {
+            val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val responseString = response.body()
+            json.decodeFromString<GetFileResponse>(responseString)
+        }
+
+        if (result.isFailure) {
+            println(result.exceptionOrNull()?.localizedMessage ?: "Ошибка в getFileInfoFromTelegram()")
+        }
+
+        return result.getOrNull()
+    }
+
+    fun saveTelegramFileLocally(filePath: String, fileName: String) {
+        val url = "$BOT_FILE_URL$botToken/$filePath"
+
+        val request: HttpRequest = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .build()
+
+        runCatching {
+            val response: HttpResponse<InputStream> = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
+            println("Status code: ${response.statusCode()}")
+
+            if (response.statusCode() != 200) {
+                error("Ошибка HTTP ${response.statusCode()}")
+            }
+
+            response.body().use { inputStream ->
+                File(fileName).outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream, 16 * 1024)
+                }
+            }
+        }
+            .onSuccess {
+                println("Файл $fileName успешно сохранен")
+            }
+            .onFailure { e ->
+                println("Ошибка при сохранении файла: ${e.message}")
+                e.printStackTrace()
+            }
+    }
+
     fun sendMessage(chatId: Long, message: String): String {
         val requestBody = SendMessageRequest(chatId, message)
         val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
@@ -62,6 +117,9 @@ class TelegramBotService(
                     listOf(
                         InlineKeyboard(text = "Изучить слова", callbackData = LEARN_WORDS_CALLBACK),
                         InlineKeyboard(text = "Статистика", callbackData = STATISTICS_CALLBACK),
+                    ),
+                    listOf(
+                        InlineKeyboard(text = "Загрузка новых слов в словарь", callbackData = LOAD_NEW_WORDS_CALLBACK)
                     ),
                     listOf(
                         InlineKeyboard(text = "Сбросить прогресс", callbackData = RESET_CLICKED),
