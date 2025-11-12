@@ -6,14 +6,14 @@ import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 
 fun main() {
     val chatId = 0L
-    val userName = "from console trainer"
+    val username = "from console trainer"
 
     Runtime.getRuntime().addShutdownHook(Thread {
         DatabaseConnection.close()
     })
 
     val trainer = try {
-        LearnWordsTrainer(DatabaseUserDictionary(chatId, userName))
+        LearnWordsTrainer(DatabaseUserDictionary(chatId, username))
     } catch (e: Exception) {
         println("Невозможно подключиться к БД. $e")
         return

@@ -2,7 +2,7 @@ package ru.ifedorov.telegrambot.data.db
 
 import ru.ifedorov.telegrambot.trainer.IUserDictionary
 import ru.ifedorov.telegrambot.trainer.model.Word
-import java.lang.Exception
+import java.io.File
 import java.sql.Connection
 import java.sql.ResultSet
 
@@ -25,6 +25,10 @@ class DatabaseUserDictionary(
         } catch (e: Exception) {
             println("Ошибка загрузки словаря. ${e.message}")
         }
+    }
+
+    fun updateDictionaryFromFile(file: File) {
+        dictionaryDataSource.updateDictionary(file)
     }
 
     private fun createTablesIfNotExists() {
@@ -136,7 +140,6 @@ class DatabaseUserDictionary(
         }
         return learnedWords
     }
-
 
     override fun getUnlearnedWords(): List<Word> {
         val userId = getUserId()

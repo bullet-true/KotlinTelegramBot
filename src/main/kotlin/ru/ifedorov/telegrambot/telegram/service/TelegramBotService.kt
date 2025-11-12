@@ -1,14 +1,9 @@
 package ru.ifedorov.telegrambot.telegram.service
 
-import ru.ifedorov.telegrambot.telegram.service.entity.InlineKeyboard
-import ru.ifedorov.telegrambot.telegram.service.entity.ReplyMarkup
-import ru.ifedorov.telegrambot.telegram.service.entity.Response
-import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageRequest
+import kotlinx.serialization.json.Json
+import ru.ifedorov.telegrambot.telegram.service.entity.*
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import ru.ifedorov.telegrambot.trainer.model.Question
-import kotlinx.serialization.json.Json
-import ru.ifedorov.telegrambot.telegram.service.entity.GetFileRequest
-import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
 import java.io.File
 import java.io.InputStream
 import java.net.URI
@@ -20,6 +15,7 @@ const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
 const val BOT_FILE_URL = "https://api.telegram.org/file/bot"
 const val LEARN_WORDS_CALLBACK = "learn_words_clicked"
 const val STATISTICS_CALLBACK = "statistics_clicked"
+const val LOAD_NEW_WORDS_CALLBACK = "load_new_words_clicked"
 const val MENU_CALLBACK = "menu_clicked"
 const val RESET_CLICKED = "reset_clicked"
 const val COMMAND_START = "/start"
@@ -78,7 +74,7 @@ class TelegramBotService(
 
     fun saveTelegramFileLocally(filePath: String, fileName: String) {
         val url = "$BOT_FILE_URL$botToken/$filePath"
-        println(url)
+
         val request: HttpRequest = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .build()
@@ -87,8 +83,15 @@ class TelegramBotService(
             val response: HttpResponse<InputStream> = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
             println("Status code: ${response.statusCode()}")
 
-            val body: InputStream = response.body()
-            body.copyTo(File(fileName).outputStream(), 16 * 1024)
+            if (response.statusCode() != 200) {
+                error("Ошибка HTTP ${response.statusCode()}")
+            }
+
+            response.body().use { inputStream ->
+                File(fileName).outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream, 16 * 1024)
+                }
+            }
         }
             .onSuccess {
                 println("Файл $fileName успешно сохранен")
@@ -114,6 +117,9 @@ class TelegramBotService(
                     listOf(
                         InlineKeyboard(text = "Изучить слова", callbackData = LEARN_WORDS_CALLBACK),
                         InlineKeyboard(text = "Статистика", callbackData = STATISTICS_CALLBACK),
+                    ),
+                    listOf(
+                        InlineKeyboard(text = "Загрузка новых слов в словарь", callbackData = LOAD_NEW_WORDS_CALLBACK)
                     ),
                     listOf(
                         InlineKeyboard(text = "Сбросить прогресс", callbackData = RESET_CLICKED),

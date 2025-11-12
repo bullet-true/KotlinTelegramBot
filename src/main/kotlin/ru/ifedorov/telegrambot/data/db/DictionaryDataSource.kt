@@ -23,6 +23,9 @@ class DictionaryDataSource() {
             )
 
             val wordsList = wordsFile.readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+
             if (wordsList.isEmpty()) {
                 throw IllegalStateException("Файл словаря пустой: ${wordsFile.absolutePath}")
             }
