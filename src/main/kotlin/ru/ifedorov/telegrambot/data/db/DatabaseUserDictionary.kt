@@ -67,6 +67,18 @@ class DatabaseUserDictionary(
                     );
                 """.trimIndent()
             )
+
+            statement.executeUpdate(
+                """
+                        CREATE TABLE IF NOT EXISTS word_images(
+                        word_id INTEGER,
+                        local_path TEXT,
+                        telegram_file_id TEXT,
+                        UNIQUE(word_id),
+                        FOREIGN KEY(word_id) REFERENCES words(id)                    
+                    );
+                """.trimIndent()
+            )
         }
     }
 
@@ -205,6 +217,36 @@ class DatabaseUserDictionary(
             "UPDATE user_answers SET correct_answer_count = 0, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
         ).use { ps ->
             ps.setInt(1, userId)
+            ps.executeUpdate()
+        }
+    }
+
+    fun getIdForWord(word: String): Int? {
+        connection.prepareStatement("SELECT id FROM words WHERE text = ?").use { ps ->
+            ps.setString(1, word)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getInt("id") else null
+        }
+    }
+
+    fun getImagePathForWord(wordId: Int): String? {
+        connection.prepareStatement("SELECT local_path FROM word_images WHERE word_id = ?").use { ps ->
+            ps.setInt(1, wordId)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getString("local_path") else null
+        }
+    }
+
+    fun saveImagePathForWord(wordId: Int, localPath: String) {
+        connection.prepareStatement(
+            """
+                    INSERT INTO word_images (word_id, local_path)
+                    VALUES (?, ?)
+                    ON CONFLICT(word_id) DO UPDATE SET local_path = excluded.local_path
+        """.trimIndent()
+        ).use { ps ->
+            ps.setInt(1, wordId)
+            ps.setString(2, localPath)
             ps.executeUpdate()
         }
     }

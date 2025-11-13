@@ -59,7 +59,7 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     }
 
     if (data == LEARN_WORDS_CALLBACK) {
-        botService.checkNextQuestionAndSend(trainer, chatId)
+        botService.checkNextQuestionAndSend(trainer, chatId, dictionary)
     }
 
     if (data == LOAD_NEW_WORDS_CALLBACK) {
@@ -84,7 +84,7 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     }
 
     data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
-        botService.checkAnswerAndSend(trainer, chatId, it)
+        botService.checkAnswerAndSend(trainer, chatId, it, dictionary)
     }
 
     document?.let { document ->
