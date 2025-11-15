@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
+import java.util.logging.Logger
 
 const val TELEGRAM_BASE_URL = "https://api.telegram.org/bot"
 const val BOT_FILE_URL = "https://api.telegram.org/file/bot"
@@ -31,9 +32,10 @@ const val DELAY_MS = 2000L
 class TelegramBotService(
     private val botToken: String
 ) {
-    val client: HttpClient = HttpClient.newBuilder().build()
-    val json = Json { ignoreUnknownKeys = true }
+    private val client: HttpClient = HttpClient.newBuilder().build()
+    private val json = Json { ignoreUnknownKeys = true }
     private val sendMessageUrl = "$TELEGRAM_BASE_URL$botToken/sendMessage"
+    private val logger = Logger.getLogger(TelegramBotService::class.java.name)
 
     fun getUpdates(updateId: Long): Response? {
         val url = "$TELEGRAM_BASE_URL$botToken/getUpdates?offset=$updateId"
@@ -48,7 +50,7 @@ class TelegramBotService(
         }
 
         if (result.isFailure) {
-            println(result.exceptionOrNull()?.localizedMessage ?: "Some error")
+            logger.warning(result.exceptionOrNull()?.localizedMessage ?: "Some error")
         }
 
         return result.getOrNull()
@@ -72,7 +74,7 @@ class TelegramBotService(
         }
 
         if (result.isFailure) {
-            println(result.exceptionOrNull()?.localizedMessage ?: "Ошибка в getFileInfoFromTelegram()")
+            logger.warning(result.exceptionOrNull()?.localizedMessage ?: "Ошибка в getFileInfoFromTelegram()")
         }
 
         return result.getOrNull()
@@ -87,7 +89,7 @@ class TelegramBotService(
 
         runCatching {
             val response: HttpResponse<InputStream> = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
-            println("Status code: ${response.statusCode()}")
+            logger.info("Status code: ${response.statusCode()}")
 
             if (response.statusCode() != 200) {
                 error("Ошибка HTTP ${response.statusCode()}")
@@ -100,10 +102,10 @@ class TelegramBotService(
             }
         }
             .onSuccess {
-                println("Файл $fileName успешно сохранен")
+                logger.info("Файл $fileName успешно сохранен")
             }
             .onFailure { e ->
-                println("Ошибка при сохранении файла: ${e.message}")
+                logger.info("Ошибка при сохранении файла: ${e.message}")
                 e.printStackTrace()
             }
     }
@@ -143,6 +145,7 @@ class TelegramBotService(
             sendMessage(chatId, "Все слова в словаре выучены")
         } else {
             sendWordImage(db, nextQuestion.correctAnswer.original, chatId)
+            sendMessage(chatId, "Выбери правильный перевод для слова:")
             sendQuestion(chatId, nextQuestion)
         }
     }
@@ -202,7 +205,7 @@ class TelegramBotService(
         return response.body()
     }
 
-    fun sendPhoto(file: File, chatId: Long, hasSpoiler: Boolean = false): String {
+    private fun sendPhoto(file: File, chatId: Long, hasSpoiler: Boolean = true): String {
         val data: MutableMap<String, Any> = LinkedHashMap()
         data["chat_id"] = chatId.toString()
         data["photo"] = file
@@ -213,7 +216,7 @@ class TelegramBotService(
             .uri(URI.create("$TELEGRAM_BASE_URL$botToken/sendPhoto"))
             .postMultipartFormData(boundary, data)
             .build()
-        val client: HttpClient = HttpClient.newBuilder().build()
+
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         return response.body()
     }
@@ -233,14 +236,14 @@ class TelegramBotService(
                     val path = Path.of(value.toURI())
                     val mimeType = Files.probeContentType(path)
                     byteArrays.add(
-                        "'${entry.key}'; filename='${path.fileName}'\r\nContent-Type: $mimeType\r\n\r\n"
+                        "\"${entry.key}\"; filename=\"${path.fileName}\"\r\nContent-Type: $mimeType\r\n\r\n"
                             .toByteArray(StandardCharsets.UTF_8)
                     )
                     byteArrays.add(Files.readAllBytes(path))
                     byteArrays.add("\r\n".toByteArray(StandardCharsets.UTF_8))
                 }
 
-                else -> byteArrays.add("'${entry.key}'\r\n\r\n$value\r\n".toByteArray(StandardCharsets.UTF_8))
+                else -> byteArrays.add("\"${entry.key}\"\r\n\r\n${entry.value}\r\n".toByteArray(StandardCharsets.UTF_8))
             }
         }
         byteArrays.add("--$boundary--".toByteArray(StandardCharsets.UTF_8))
@@ -250,22 +253,70 @@ class TelegramBotService(
         return this
     }
 
-    fun sendWordImage(
+    private fun getFileIdFromSendPhotoResponse(responseString: String): String? {
+        val result = runCatching {
+            json.decodeFromString<SendPhotoResponse>(responseString)
+        }
+
+        if (result.isFailure) {
+            logger.warning(result.exceptionOrNull()?.localizedMessage ?: "Error in getFileIdFromSendPhotoResponse")
+            return null
+        }
+
+        return result.getOrNull()?.result?.photo?.lastOrNull()?.fileId
+    }
+
+    private fun sendPhotoByFileId(fileId: String, chatId: Long, hasSpoiler: Boolean = true): String {
+        val body = """
+            {
+                "chat_id": $chatId,
+                "photo": "$fileId",
+                "has_spoiler": $hasSpoiler               
+            }
+        """.trimIndent()
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$TELEGRAM_BASE_URL$botToken/sendPhoto"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+
+        return response.body()
+    }
+
+
+    private fun sendWordImage(
         db: DatabaseUserDictionary,
         word: String,
         chatId: Long,
     ) {
 
         val wordId = db.getIdForWord(word) ?: return
+
+        val telegramFileId = db.getTelegramFileIdForWord(wordId)
+        if (!telegramFileId.isNullOrBlank()) {
+            val fileIdResponse = sendPhotoByFileId(telegramFileId, chatId)
+            logger.info("Фото отправлено по file_id: \n$fileIdResponse")
+            return
+        }
+
         var imagePath = db.getImagePathForWord(wordId)
 
         if (imagePath == null) {
             val dir = File("images")
-            if (!dir.exists()) return
+            if (!dir.exists()) {
+                val created = dir.mkdir()
+                if (!created) {
+                    logger.warning("Не удалось создать папку images")
+                    return
+                }
+            }
 
             val file = dir.listFiles()?.firstOrNull {
                 val nameWithoutExt = it.name.substringBeforeLast('.')
-                nameWithoutExt == word
+                nameWithoutExt.equals(word, ignoreCase = true)
             }
 
             if (file != null && file.exists()) {
@@ -275,9 +326,16 @@ class TelegramBotService(
         }
 
         val file = File(imagePath)
-        if (file.exists()) {
-            val response = sendPhoto(file, chatId)
-            println(response)
+        if (!file.exists()) return
+
+        val multipartResponse = sendPhoto(file, chatId)
+        logger.info("Фото отправлено как файл, через multipart запрос: \n$multipartResponse")
+
+        val fileId = getFileIdFromSendPhotoResponse(multipartResponse)
+        if (!fileId.isNullOrBlank()) {
+            db.saveTelegramFileIdForWord(wordId, fileId)
+        } else {
+            logger.warning("file_id не найден в response")
         }
     }
 }

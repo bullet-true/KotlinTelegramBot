@@ -5,6 +5,7 @@ import ru.ifedorov.telegrambot.trainer.model.Word
 import java.io.File
 import java.sql.Connection
 import java.sql.ResultSet
+import java.util.logging.Logger
 
 const val DEFAULT_LEARNING_THRESHOLD = 3
 
@@ -16,6 +17,7 @@ class DatabaseUserDictionary(
 
     private val connection: Connection = DatabaseConnection.connection
     private val dictionaryDataSource = DictionaryDataSource()
+    private val logger = Logger.getLogger(DatabaseUserDictionary::class.java.name)
 
     init {
         createTablesIfNotExists()
@@ -23,7 +25,7 @@ class DatabaseUserDictionary(
         try {
             dictionaryDataSource.updateDictionary()
         } catch (e: Exception) {
-            println("Ошибка загрузки словаря. ${e.message}")
+            logger.warning("Ошибка загрузки словаря. ${e.message}")
         }
     }
 
@@ -247,6 +249,28 @@ class DatabaseUserDictionary(
         ).use { ps ->
             ps.setInt(1, wordId)
             ps.setString(2, localPath)
+            ps.executeUpdate()
+        }
+    }
+
+    fun getTelegramFileIdForWord(wordId: Int): String? {
+        connection.prepareStatement("SELECT telegram_file_id FROM word_images WHERE word_id = ?").use { ps ->
+            ps.setInt(1, wordId)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getString("telegram_file_id") else null
+        }
+    }
+
+    fun saveTelegramFileIdForWord(wordId: Int, fileId: String) {
+        connection.prepareStatement(
+            """
+                    INSERT INTO word_images (word_id, telegram_file_id)
+                    VALUES (?, ?)
+                    ON CONFLICT(word_id) DO UPDATE SET telegram_file_id = excluded.telegram_file_id
+        """.trimIndent()
+        ).use { ps ->
+            ps.setInt(1, wordId)
+            ps.setString(2, fileId)
             ps.executeUpdate()
         }
     }
