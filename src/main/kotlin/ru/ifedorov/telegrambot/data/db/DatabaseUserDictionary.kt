@@ -5,6 +5,7 @@ import ru.ifedorov.telegrambot.trainer.model.Word
 import java.io.File
 import java.sql.Connection
 import java.sql.ResultSet
+import java.util.logging.Logger
 
 const val DEFAULT_LEARNING_THRESHOLD = 3
 
@@ -16,6 +17,7 @@ class DatabaseUserDictionary(
 
     private val connection: Connection = DatabaseConnection.connection
     private val dictionaryDataSource = DictionaryDataSource()
+    private val logger = Logger.getLogger(DatabaseUserDictionary::class.java.name)
 
     init {
         createTablesIfNotExists()
@@ -23,7 +25,7 @@ class DatabaseUserDictionary(
         try {
             dictionaryDataSource.updateDictionary()
         } catch (e: Exception) {
-            println("Ошибка загрузки словаря. ${e.message}")
+            logger.warning("Ошибка загрузки словаря. ${e.message}")
         }
     }
 
@@ -64,6 +66,18 @@ class DatabaseUserDictionary(
                         FOREIGN KEY(user_id) REFERENCES users(id),
                         FOREIGN KEY(word_id) REFERENCES words(id),
                         UNIQUE(user_id, word_id)
+                    );
+                """.trimIndent()
+            )
+
+            statement.executeUpdate(
+                """
+                        CREATE TABLE IF NOT EXISTS word_images(
+                        word_id INTEGER,
+                        local_path TEXT,
+                        telegram_file_id TEXT,
+                        UNIQUE(word_id),
+                        FOREIGN KEY(word_id) REFERENCES words(id)                    
                     );
                 """.trimIndent()
             )
@@ -205,6 +219,58 @@ class DatabaseUserDictionary(
             "UPDATE user_answers SET correct_answer_count = 0, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
         ).use { ps ->
             ps.setInt(1, userId)
+            ps.executeUpdate()
+        }
+    }
+
+    fun getIdForWord(word: String): Int? {
+        connection.prepareStatement("SELECT id FROM words WHERE text = ?").use { ps ->
+            ps.setString(1, word)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getInt("id") else null
+        }
+    }
+
+    fun getImagePathForWord(wordId: Int): String? {
+        connection.prepareStatement("SELECT local_path FROM word_images WHERE word_id = ?").use { ps ->
+            ps.setInt(1, wordId)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getString("local_path") else null
+        }
+    }
+
+    fun saveImagePathForWord(wordId: Int, localPath: String) {
+        connection.prepareStatement(
+            """
+                    INSERT INTO word_images (word_id, local_path)
+                    VALUES (?, ?)
+                    ON CONFLICT(word_id) DO UPDATE SET local_path = excluded.local_path
+        """.trimIndent()
+        ).use { ps ->
+            ps.setInt(1, wordId)
+            ps.setString(2, localPath)
+            ps.executeUpdate()
+        }
+    }
+
+    fun getTelegramFileIdForWord(wordId: Int): String? {
+        connection.prepareStatement("SELECT telegram_file_id FROM word_images WHERE word_id = ?").use { ps ->
+            ps.setInt(1, wordId)
+            val rs = ps.executeQuery()
+            return if (rs.next()) rs.getString("telegram_file_id") else null
+        }
+    }
+
+    fun saveTelegramFileIdForWord(wordId: Int, fileId: String) {
+        connection.prepareStatement(
+            """
+                    INSERT INTO word_images (word_id, telegram_file_id)
+                    VALUES (?, ?)
+                    ON CONFLICT(word_id) DO UPDATE SET telegram_file_id = excluded.telegram_file_id
+        """.trimIndent()
+        ).use { ps ->
+            ps.setInt(1, wordId)
+            ps.setString(2, fileId)
             ps.executeUpdate()
         }
     }
