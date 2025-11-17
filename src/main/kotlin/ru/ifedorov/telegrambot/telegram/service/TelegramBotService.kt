@@ -1,7 +1,7 @@
 package ru.ifedorov.telegrambot.telegram.service
 
 import kotlinx.serialization.json.Json
-import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
+import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
 import ru.ifedorov.telegrambot.telegram.service.entity.*
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import ru.ifedorov.telegrambot.trainer.model.Question
@@ -30,7 +30,8 @@ const val CALLBACK_DATA_ANSWER_PREFIX = "answer_"
 const val DELAY_MS = 2000L
 
 class TelegramBotService(
-    private val botToken: String
+    private val botToken: String,
+    val dictionaryRepository: DatabaseUserDictionaryRepository
 ) {
     private val client: HttpClient = HttpClient.newBuilder().build()
     private val json = Json { ignoreUnknownKeys = true }
@@ -139,18 +140,18 @@ class TelegramBotService(
         return postJson(sendMessageUrl, requestBodyString)
     }
 
-    fun checkNextQuestionAndSend(trainer: LearnWordsTrainer, chatId: Long, db: DatabaseUserDictionary) {
+    fun checkNextQuestionAndSend(trainer: LearnWordsTrainer, chatId: Long) {
         val nextQuestion = trainer.getNextQuestion()
         if (nextQuestion == null) {
             sendMessage(chatId, "Все слова в словаре выучены")
         } else {
-            sendWordImage(db, nextQuestion.correctAnswer.original, chatId)
+            sendWordImage(nextQuestion.correctAnswer.original, chatId)
             sendMessage(chatId, "Выбери правильный перевод для слова:")
             sendQuestion(chatId, nextQuestion)
         }
     }
 
-    fun checkAnswerAndSend(trainer: LearnWordsTrainer, chatId: Long, data: String, db: DatabaseUserDictionary) {
+    fun checkAnswerAndSend(trainer: LearnWordsTrainer, chatId: Long, data: String) {
         val userAnswerIndex = data.substringAfter(CALLBACK_DATA_ANSWER_PREFIX).toInt()
         val correctAnswer = trainer.getCurrentQuestion()?.correctAnswer
 
@@ -162,7 +163,7 @@ class TelegramBotService(
             }
 
             sendMessage(chatId, message)
-            checkNextQuestionAndSend(trainer, chatId, db)
+            checkNextQuestionAndSend(trainer, chatId)
         }
     }
 
@@ -288,21 +289,20 @@ class TelegramBotService(
 
 
     private fun sendWordImage(
-        db: DatabaseUserDictionary,
         word: String,
         chatId: Long,
     ) {
 
-        val wordId = db.getIdForWord(word) ?: return
+        val wordId = dictionaryRepository.getIdForWord(word) ?: return
 
-        val telegramFileId = db.getTelegramFileIdForWord(wordId)
+        val telegramFileId = dictionaryRepository.getTelegramFileIdForWord(wordId)
         if (!telegramFileId.isNullOrBlank()) {
             val fileIdResponse = sendPhotoByFileId(telegramFileId, chatId)
             logger.info("Фото отправлено по file_id: \n$fileIdResponse")
             return
         }
 
-        var imagePath = db.getImagePathForWord(wordId)
+        var imagePath = dictionaryRepository.getImagePathForWord(wordId)
 
         if (imagePath == null) {
             val dir = File("images")
@@ -320,7 +320,7 @@ class TelegramBotService(
             }
 
             if (file != null && file.exists()) {
-                db.saveImagePathForWord(wordId, file.path)
+                dictionaryRepository.saveImagePathForWord(wordId, file.path)
                 imagePath = file.path
             } else return
         }
@@ -333,7 +333,7 @@ class TelegramBotService(
 
         val fileId = getFileIdFromSendPhotoResponse(multipartResponse)
         if (!fileId.isNullOrBlank()) {
-            db.saveTelegramFileIdForWord(wordId, fileId)
+            dictionaryRepository.saveTelegramFileIdForWord(wordId, fileId)
         } else {
             logger.warning("file_id не найден в response")
         }

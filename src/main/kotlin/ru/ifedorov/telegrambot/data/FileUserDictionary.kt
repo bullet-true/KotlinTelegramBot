@@ -14,22 +14,23 @@ class FileUserDictionary(
 
     private val dictionary = loadDictionary()
 
-    override fun getNumOfLearnedWords(): Int = dictionary.count { it.correctAnswersCount >= learningThreshold }
+    override fun getNumOfLearnedWords(chatId: Long, username: String): Int =
+        dictionary.count { it.correctAnswersCount >= learningThreshold }
 
     override fun getSize(): Int = dictionary.size
 
-    override fun getLearnedWords(): List<Word> =
+    override fun getLearnedWords(chatId: Long, username: String): List<Word> =
         dictionary.filter { it.correctAnswersCount >= learningThreshold }
 
-    override fun getUnlearnedWords(): List<Word> =
+    override fun getUnlearnedWords(chatId: Long, username: String): List<Word> =
         dictionary.filter { it.correctAnswersCount < learningThreshold }
 
-    override fun setCorrectAnswersCount(word: String, correctAnswersCount: Int) {
+    override fun setCorrectAnswersCount(chatId: Long, username: String, word: String, correctAnswersCount: Int) {
         dictionary.find { it.original == word }?.correctAnswersCount = correctAnswersCount
         saveDictionary()
     }
 
-    override fun resetUserProgress() {
+    override fun resetUserProgress(chatId: Long, username: String) {
         dictionary.forEach { it.correctAnswersCount = 0 }
         saveDictionary()
     }

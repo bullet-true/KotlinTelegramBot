@@ -10,7 +10,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test statistics with 4 words of 7`() {
         val file = this::class.java.classLoader.getResource("4_words_of_7.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
 
         assertEquals(
             Statistics(learnedCount = 4, totalCount = 7, percent = 57),
@@ -23,7 +23,7 @@ class LearnWordsTrainerTest {
         val file = this::class.java.classLoader.getResource("corrupted_file.txt")!!.file
 
         assertFailsWith<IllegalStateException> {
-            val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+            val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
             trainer.getStatistics()
         }
     }
@@ -31,7 +31,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test getNextQuestion() with 5 unlearned words`() {
         val file = this::class.java.classLoader.getResource("5_unlearned_words.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
         val question = trainer.getNextQuestion()
 
         assertNotNull(question)
@@ -42,7 +42,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test getNextQuestion() with 1 unlearned word`() {
         val file = this::class.java.classLoader.getResource("1_unlearned_word.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
         val question = trainer.getNextQuestion()
 
         assertNotNull(question)
@@ -53,7 +53,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test getNextQuestion() with all words learned`() {
         val file = this::class.java.classLoader.getResource("all_words_learned.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
         val question = trainer.getNextQuestion()
 
         assertNull(question)
@@ -62,7 +62,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test checkAnswer() with true`() {
         val file = this::class.java.classLoader.getResource("4_words_of_7.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
         val question = trainer.getNextQuestion()
 
         val correctIndex = question!!.variants.indexOf(question.correctAnswer)
@@ -73,7 +73,7 @@ class LearnWordsTrainerTest {
     @Test
     fun `test checkAnswer() with false`() {
         val file = this::class.java.classLoader.getResource("4_words_of_7.txt")!!.file
-        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file))
+        val trainer = LearnWordsTrainer(dictionary = FileUserDictionary(file), 0L, "test")
         val question = trainer.getNextQuestion()
 
         val correctIndex = question!!.variants.indexOf(question.correctAnswer)
@@ -90,9 +90,9 @@ class LearnWordsTrainerTest {
         val ordinalText = File(file).readText()
 
         val dictionary = FileUserDictionary(file)
-        val trainer = LearnWordsTrainer(dictionary)
-        val unlearnedWords = dictionary.getUnlearnedWords()
-        val learnedWords = dictionary.getLearnedWords()
+        val trainer = LearnWordsTrainer(dictionary, 0L, "test")
+        val unlearnedWords = dictionary.getUnlearnedWords(0L, "test")
+        val learnedWords = dictionary.getLearnedWords(0L, "test")
 
         try {
             assertTrue(unlearnedWords.any { it.correctAnswersCount > 0 })

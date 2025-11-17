@@ -1,7 +1,7 @@
 package ru.ifedorov.telegrambot.telegram
 
 import ru.ifedorov.telegrambot.data.db.DatabaseConnection
-import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
+import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
 import ru.ifedorov.telegrambot.telegram.service.*
 import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
 import ru.ifedorov.telegrambot.telegram.service.entity.Update
@@ -11,7 +11,7 @@ import java.io.File
 fun main(args: Array<String>) {
     val botToken = args[0]
     val trainers = HashMap<Long, LearnWordsTrainer>()
-    val telegramBotService = TelegramBotService(botToken)
+    val telegramBotService = TelegramBotService(botToken, DatabaseUserDictionaryRepository())
     var updateId = 0L
 
     Runtime.getRuntime().addShutdownHook(Thread {
@@ -31,19 +31,24 @@ fun main(args: Array<String>) {
     }
 }
 
-fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, botService: TelegramBotService) {
+fun handleUpdate(
+    update: Update,
+    trainers: HashMap<Long, LearnWordsTrainer>,
+    botService: TelegramBotService
+) {
     val chatId = update.message?.chat?.id
         ?: update.callbackQuery?.message?.chat?.id
         ?: return
 
+    val dictionary = botService.dictionaryRepository
     val username = update.message?.from?.username ?: ""
     val message = update.message?.text
     val data = update.callbackQuery?.data
     val document = update.message?.document
 
-    val dictionary = DatabaseUserDictionary(chatId, username)
+
     val trainer = trainers.getOrPut(chatId) {
-        LearnWordsTrainer(dictionary)
+        LearnWordsTrainer(dictionary, chatId, username)
     }
 
     if (message == COMMAND_START || data == MENU_CALLBACK) {
@@ -59,7 +64,7 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     }
 
     if (data == LEARN_WORDS_CALLBACK) {
-        botService.checkNextQuestionAndSend(trainer, chatId, dictionary)
+        botService.checkNextQuestionAndSend(trainer, chatId)
     }
 
     if (data == LOAD_NEW_WORDS_CALLBACK) {
@@ -84,7 +89,7 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     }
 
     data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
-        botService.checkAnswerAndSend(trainer, chatId, it, dictionary)
+        botService.checkAnswerAndSend(trainer, chatId, it)
     }
 
     document?.let { document ->
