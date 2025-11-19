@@ -11,7 +11,12 @@ import java.io.File
 fun main(args: Array<String>) {
     val botToken = args[0]
     val trainers = HashMap<Long, LearnWordsTrainer>()
-    val telegramBotService = TelegramBotService(botToken, DatabaseUserDictionaryRepository())
+    val telegramBotService: TelegramBotService = TelegramBotService(
+        botToken = botToken,
+        dictionaryRepository = DatabaseUserDictionaryRepository(),
+        dynamicMessage = DynamicMessage(),
+        dynamicPhoto = DynamicPhoto()
+    )
     var updateId = 0L
 
     Runtime.getRuntime().addShutdownHook(Thread {
@@ -57,10 +62,8 @@ fun handleUpdate(
 
     if (data == STATISTICS_CALLBACK) {
         val statistics = trainer.getStatistics()
-        botService.sendMessage(
-            chatId = chatId,
-            message = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
-        )
+        val text = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
+        botService.sendDynamicMessage(chatId, text, withBackButton = true)
     }
 
     if (data == LEARN_WORDS_CALLBACK) {
@@ -68,24 +71,20 @@ fun handleUpdate(
     }
 
     if (data == LOAD_NEW_WORDS_CALLBACK) {
-        botService.sendMessage(
-            chatId,
-            """
-                Для загрузки новых слов с словарь отправьте в чат бота 
-                текстовый файл формата txt, который содержит 
-                "слово|перевод", с разделителем "|" например:
-                
-                cat|кошка
-                dog|собака
-                
-                Можно добавлять несколько слов, каждое с новой строки.
-            """.trimIndent()
-        )
+        val text = """
+            Для загрузки новых слов в словарь отправьте текстовый файл формата txt с разделителем "|", например:
+            
+            cat|кошка
+            dog|собака
+            
+            Каждое слово с новой строки.
+        """.trimIndent()
+        botService.sendDynamicMessage(chatId, text, withBackButton = true)
     }
 
     if (data == RESET_CLICKED) {
         trainer.resetProgress()
-        botService.sendMessage(chatId, "Прогресс сброшен")
+        botService.sendDynamicMessage(chatId, "Прогресс сброшен", withBackButton = true)
     }
 
     data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
@@ -103,17 +102,23 @@ fun handleUpdate(
 
             try {
                 dictionary.updateDictionaryFromFile(File(fileName))
-                botService.sendMessage(chatId, "Словарь успешно обновлен из файла $fileName")
-            } catch (e: Exception) {
-                botService.sendMessage(
+                botService.sendDynamicMessage(
                     chatId,
-                    "Ошибка при обновлении словаря из файла. Проверьте формат файла и его содержание"
+                    "Словарь успешно обновлён из файла $fileName",
+                    withBackButton = true
+                )
+
+            } catch (e: Exception) {
+                botService.sendDynamicMessage(
+                    chatId,
+                    "Ошибка при обновлении словаря. Проверьте формат файла и его содержание.",
+                    withBackButton = true
                 )
                 println("Не удалось обновить словарь из файла $fileName. Ошибка: ${e.message}")
             }
 
         } else {
-            botService.sendMessage(chatId, "Ошибка при сохранении файла")
+            botService.sendDynamicMessage(chatId, "Ошибка при сохранении файла", withBackButton = true)
         }
     }
 }

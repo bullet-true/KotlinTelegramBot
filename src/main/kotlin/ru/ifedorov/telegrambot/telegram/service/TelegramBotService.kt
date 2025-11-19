@@ -4,7 +4,6 @@ import kotlinx.serialization.json.Json
 import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
 import ru.ifedorov.telegrambot.telegram.service.entity.*
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
-import ru.ifedorov.telegrambot.trainer.model.Question
 import java.io.File
 import java.io.InputStream
 import java.math.BigInteger
@@ -31,7 +30,9 @@ const val DELAY_MS = 2000L
 
 class TelegramBotService(
     private val botToken: String,
-    val dictionaryRepository: DatabaseUserDictionaryRepository
+    val dictionaryRepository: DatabaseUserDictionaryRepository,
+    val dynamicMessage: DynamicMessage,
+    val dynamicPhoto: DynamicPhoto
 ) {
     private val client: HttpClient = HttpClient.newBuilder().build()
     private val json = Json { ignoreUnknownKeys = true }
@@ -118,6 +119,9 @@ class TelegramBotService(
     }
 
     fun sendMenu(chatId: Long): String {
+        deleteLastMessage(chatId)
+        deleteLastPhoto(chatId)
+
         val requestBody = SendMessageRequest(
             chatId = chatId,
             text = "Основное меню",
@@ -137,62 +141,166 @@ class TelegramBotService(
             )
         )
         val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
-        return postJson(sendMessageUrl, requestBodyString)
+        val responseString = postJson(sendMessageUrl, requestBodyString)
+
+        val messageResponse = runCatching {
+            json.decodeFromString<SendMessageResponse>(responseString)
+        }.getOrNull()
+
+        messageResponse?.result?.messageId?.let {
+            dynamicMessage.saveMessageId(chatId, it)
+        }
+
+        return responseString
     }
 
-    fun checkNextQuestionAndSend(trainer: LearnWordsTrainer, chatId: Long) {
-        val nextQuestion = trainer.getNextQuestion()
-        if (nextQuestion == null) {
-            sendMessage(chatId, "Все слова в словаре выучены")
-        } else {
-            sendWordImage(nextQuestion.correctAnswer.original, chatId)
-            sendMessage(chatId, "Выбери правильный перевод для слова:")
-            sendQuestion(chatId, nextQuestion)
-        }
-    }
 
     fun checkAnswerAndSend(trainer: LearnWordsTrainer, chatId: Long, data: String) {
         val userAnswerIndex = data.substringAfter(CALLBACK_DATA_ANSWER_PREFIX).toInt()
-        val correctAnswer = trainer.getCurrentQuestion()?.correctAnswer
+        val correctAnswer = trainer.getCurrentQuestion()?.correctAnswer ?: return
+        val isCorrect = trainer.checkAnswer(userAnswerIndex)
 
-        if (correctAnswer != null) {
-            val message = if (trainer.checkAnswer(userAnswerIndex)) {
-                "Правильно!"
+        val resultText = if (isCorrect) {
+            "Правильно!\n\n"
+        } else {
+            "Неправильно!\n${correctAnswer.original} – это ${correctAnswer.translate}\n\n"
+        }
+
+        checkNextQuestionAndSend(trainer, chatId, resultText)
+    }
+
+    fun editMessageWithKeyboard(
+        chatId: Long,
+        messageId: Long,
+        text: String,
+        replyMarkup: ReplyMarkup? = null,
+        parseMode: String? = "HTML"
+    ): Boolean {
+        val url = "$TELEGRAM_BASE_URL$botToken/editMessageText"
+        val requestBody = EditMessageRequest(chatId, messageId, text, parseMode, replyMarkup)
+        val requestBodyString = json.encodeToString<EditMessageRequest>(requestBody)
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBodyString))
+            .build()
+
+        return runCatching {
+            val response: HttpResponse<String> = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val responseBody = response.body()
+            json.decodeFromString<EditMessageResponse>(responseBody).ok
+        }.onFailure { e ->
+            logger.warning("Ошибка при редактировании сообщения с помощью editMessageText: ${e.message}")
+        }.getOrElse { false }
+    }
+
+    fun sendDynamicMessage(
+        chatId: Long,
+        text: String,
+        replyMarkup: ReplyMarkup? = null,
+        withBackButton: Boolean = false,
+        parseMode: String? = "HTML"
+    ): Long? {
+        deleteLastMessage(chatId)
+
+        val finalReplyMarkup = if (withBackButton) {
+            ReplyMarkup(
+                listOf(listOf(InlineKeyboard("Назад в меню", MENU_CALLBACK)))
+            )
+        } else {
+            replyMarkup
+        }
+
+        val request = SendMessageRequest(chatId, text, finalReplyMarkup, parseMode)
+        val responseString = postJson(sendMessageUrl, json.encodeToString(request))
+
+        val messageId = runCatching {
+            json.decodeFromString<SendMessageResponse>(responseString).result?.messageId
+        }.getOrNull()
+
+        messageId?.let { dynamicMessage.saveMessageId(chatId, it) }
+        return messageId
+    }
+
+    fun checkNextQuestionAndSend(trainer: LearnWordsTrainer, chatId: Long, resultPrefix: String? = null) {
+        val question = trainer.getNextQuestion()
+
+        if (question == null) {
+            deleteLastPhoto(chatId)
+            val message = if (resultPrefix != null) {
+                resultPrefix + "Все слова выучены"
             } else {
-                "Неправильно! ${correctAnswer.original} – это ${correctAnswer.translate}"
+                "Все слова в словаре выучены"
             }
+            sendDynamicMessage(chatId, message)
+            return
+        }
 
-            sendMessage(chatId, message)
-            checkNextQuestionAndSend(trainer, chatId)
+        deleteLastPhoto(chatId)
+        sendWordImage(question.correctAnswer.original, chatId)
+
+        val baseText = "Выбери правильный перевод для слова:\n${question.correctAnswer.original}"
+        val text = if (resultPrefix != null) resultPrefix + baseText else baseText
+
+        val answerButtons = question.variants.mapIndexed { index, word ->
+            listOf(InlineKeyboard(word.translate, "$CALLBACK_DATA_ANSWER_PREFIX$index"))
+        }
+
+        val menuButton = listOf(listOf(InlineKeyboard("Выйти в меню", MENU_CALLBACK)))
+        val markup = ReplyMarkup(answerButtons + menuButton)
+
+        sendDynamicMessage(chatId, text, markup)
+    }
+
+    private fun deleteLastMessage(chatId: Long) {
+        dynamicMessage.getMessageId(chatId)?.let { messageId ->
+            deleteMessage(chatId, messageId)
+            dynamicMessage.removeMessageId(chatId)
         }
     }
 
-    private fun sendQuestion(chatId: Long, question: Question): String {
-        val answerButtons = question.variants.mapIndexed { index, word ->
-            listOf(
-                InlineKeyboard(
-                    text = word.translate,
-                    callbackData = "$CALLBACK_DATA_ANSWER_PREFIX$index"
-                )
-            )
+    private fun deleteLastPhoto(chatId: Long) {
+        dynamicPhoto.getPhotoMessageId(chatId)?.let { photoId ->
+            deleteMessage(chatId, photoId)
+            dynamicPhoto.removePhotoMessageId(chatId)
         }
+    }
 
-        val menuButton = listOf(
-            listOf(
-                InlineKeyboard(
-                    text = "Выйти в меню",
-                    callbackData = MENU_CALLBACK
-                )
-            )
-        )
+    private fun deleteMessage(chatId: Long, messageId: Long): Boolean {
+        val url = "$TELEGRAM_BASE_URL$botToken/deleteMessage"
+        val body = """
+            {
+                "chat_id": $chatId, 
+                "message_id": $messageId
+            }
+        """.trimIndent()
 
-        val requestBody = SendMessageRequest(
-            chatId = chatId,
-            text = question.correctAnswer.original,
-            replyMarkup = ReplyMarkup(answerButtons + menuButton)
-        )
-        val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
-        return postJson(sendMessageUrl, requestBodyString)
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        return runCatching {
+            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            json.decodeFromString<DeleteMessageResponse>(response.body()).ok
+        }.getOrDefault(false)
+    }
+
+    private fun sendDynamicPhoto(chatId: Long, file: File, hasSpoiler: Boolean = true): String {
+        deleteLastPhoto(chatId)
+
+        val responseString = sendPhoto(file, chatId, hasSpoiler)
+
+        val sendPhotoResponse = runCatching {
+            json.decodeFromString<SendPhotoResponse>(responseString)
+        }.getOrNull()
+
+        val messageId = sendPhotoResponse?.result?.messageId
+        messageId?.let { dynamicPhoto.savePhotoMessageId(chatId, it) }
+
+        return responseString
     }
 
     private fun postJson(url: String, body: String): String {
@@ -287,21 +395,10 @@ class TelegramBotService(
         return response.body()
     }
 
-
-    private fun sendWordImage(
-        word: String,
-        chatId: Long,
-    ) {
-
+    private fun sendWordImage(word: String, chatId: Long) {
         val wordId = dictionaryRepository.getIdForWord(word) ?: return
 
         val telegramFileId = dictionaryRepository.getTelegramFileIdForWord(wordId)
-        if (!telegramFileId.isNullOrBlank()) {
-            val fileIdResponse = sendPhotoByFileId(telegramFileId, chatId)
-            logger.info("Фото отправлено по file_id: \n$fileIdResponse")
-            return
-        }
-
         var imagePath = dictionaryRepository.getImagePathForWord(wordId)
 
         if (imagePath == null) {
@@ -315,27 +412,43 @@ class TelegramBotService(
             }
 
             val file = dir.listFiles()?.firstOrNull {
-                val nameWithoutExt = it.name.substringBeforeLast('.')
-                nameWithoutExt.equals(word, ignoreCase = true)
-            }
+                it.name.substringBeforeLast('.').equals(word, ignoreCase = true)
+            } ?: return
 
-            if (file != null && file.exists()) {
-                dictionaryRepository.saveImagePathForWord(wordId, file.path)
-                imagePath = file.path
-            } else return
+            dictionaryRepository.saveImagePathForWord(wordId, file.path)
+            imagePath = file.path
         }
 
         val file = File(imagePath)
         if (!file.exists()) return
 
-        val multipartResponse = sendPhoto(file, chatId)
-        logger.info("Фото отправлено как файл, через multipart запрос: \n$multipartResponse")
+        deleteLastPhoto(chatId)
+
+        if (!telegramFileId.isNullOrBlank()) {
+            val fileIdResponse = sendPhotoByFileId(telegramFileId, chatId)
+            logger.info("Фото отправлено по file_id: \n$fileIdResponse")
+
+            val messageId = runCatching {
+                json.decodeFromString<SendPhotoResponse>(fileIdResponse).result?.messageId
+            }.getOrNull()
+            messageId?.let { dynamicPhoto.savePhotoMessageId(chatId, it) }
+
+            return
+        }
+
+        val multipartResponse = sendDynamicPhoto(chatId, file)
+        logger.info("Фото отправлено как файл через multipart запрос: \n$multipartResponse")
+
+        val messageId = runCatching {
+            json.decodeFromString<SendPhotoResponse>(multipartResponse).result?.messageId
+        }.getOrNull()
+        messageId?.let { dynamicPhoto.savePhotoMessageId(chatId, it) }
 
         val fileId = getFileIdFromSendPhotoResponse(multipartResponse)
         if (!fileId.isNullOrBlank()) {
             dictionaryRepository.saveTelegramFileIdForWord(wordId, fileId)
         } else {
-            logger.warning("file_id не найден в response")
+            logger.warning("file_id не найден в multipartResponse")
         }
     }
 }
