@@ -1,7 +1,7 @@
 package ru.ifedorov.telegrambot.console
 
 import ru.ifedorov.telegrambot.data.db.DatabaseConnection
-import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
+import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 
 fun main() {
@@ -13,7 +13,7 @@ fun main() {
     })
 
     val trainer = try {
-        LearnWordsTrainer(DatabaseUserDictionary(chatId, username))
+        LearnWordsTrainer(DatabaseUserDictionaryRepository(), chatId, username)
     } catch (e: Exception) {
         println("Невозможно подключиться к БД. $e")
         return

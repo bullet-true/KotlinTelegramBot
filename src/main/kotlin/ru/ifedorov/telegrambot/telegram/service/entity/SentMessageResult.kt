@@ -4,9 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class TelegramPhoto(
+data class SentMessageResult(
     @SerialName("message_id")
-    val messageId: Long,
-    @SerialName("photo")
-    val photo: List<TelegramPhotoSize>? = null
+    val messageId: Long
 )

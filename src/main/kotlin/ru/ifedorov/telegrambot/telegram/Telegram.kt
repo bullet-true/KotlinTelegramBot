@@ -1,7 +1,7 @@
 package ru.ifedorov.telegrambot.telegram
 
 import ru.ifedorov.telegrambot.data.db.DatabaseConnection
-import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionary
+import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
 import ru.ifedorov.telegrambot.telegram.service.*
 import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
 import ru.ifedorov.telegrambot.telegram.service.entity.Update
@@ -11,7 +11,12 @@ import java.io.File
 fun main(args: Array<String>) {
     val botToken = args[0]
     val trainers = HashMap<Long, LearnWordsTrainer>()
-    val telegramBotService = TelegramBotService(botToken)
+    val telegramBotService: TelegramBotService = TelegramBotService(
+        botToken = botToken,
+        dictionaryRepository = DatabaseUserDictionaryRepository(),
+        dynamicMessage = DynamicMessage(),
+        dynamicPhoto = DynamicPhoto()
+    )
     var updateId = 0L
 
     Runtime.getRuntime().addShutdownHook(Thread {
@@ -31,19 +36,24 @@ fun main(args: Array<String>) {
     }
 }
 
-fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, botService: TelegramBotService) {
+fun handleUpdate(
+    update: Update,
+    trainers: HashMap<Long, LearnWordsTrainer>,
+    botService: TelegramBotService
+) {
     val chatId = update.message?.chat?.id
         ?: update.callbackQuery?.message?.chat?.id
         ?: return
 
+    val dictionary = botService.dictionaryRepository
     val username = update.message?.from?.username ?: ""
     val message = update.message?.text
     val data = update.callbackQuery?.data
     val document = update.message?.document
 
-    val dictionary = DatabaseUserDictionary(chatId, username)
+
     val trainer = trainers.getOrPut(chatId) {
-        LearnWordsTrainer(dictionary)
+        LearnWordsTrainer(dictionary, chatId, username)
     }
 
     if (message == COMMAND_START || data == MENU_CALLBACK) {
@@ -51,40 +61,42 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
     }
 
     if (data == STATISTICS_CALLBACK) {
-        val statistics = trainer.getStatistics()
-        botService.sendMessage(
-            chatId = chatId,
-            message = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
-        )
+        botService.sendOrUpdateStatistics(trainer, chatId)
     }
 
     if (data == LEARN_WORDS_CALLBACK) {
-        botService.checkNextQuestionAndSend(trainer, chatId, dictionary)
+        botService.checkNextQuestionAndSend(trainer, chatId)
     }
 
     if (data == LOAD_NEW_WORDS_CALLBACK) {
-        botService.sendMessage(
-            chatId,
-            """
-                Для загрузки новых слов с словарь отправьте в чат бота 
-                текстовый файл формата txt, который содержит 
-                "слово|перевод", с разделителем "|" например:
-                
-                cat|кошка
-                dog|собака
-                
-                Можно добавлять несколько слов, каждое с новой строки.
-            """.trimIndent()
-        )
+        val text = """
+            Для загрузки новых слов в словарь отправьте текстовый файл формата txt с разделителем "|", например:
+            
+            cat|кошка
+            dog|собака
+            
+            Каждое слово с новой строки.
+        """.trimIndent()
+        botService.sendDynamicMessage(chatId, text, withBackButton = true)
     }
 
     if (data == RESET_CLICKED) {
         trainer.resetProgress()
-        botService.sendMessage(chatId, "Прогресс сброшен")
+        botService.sendOrUpdateStatistics(trainer, chatId)
+        botService.sendDynamicMessage(chatId, "Прогресс сброшен", withBackButton = true)
+    }
+
+    if (message == "/undo") {
+        val prevText = botService.dynamicMessage.undoStatisticsText(chatId)
+        prevText?.let { text ->
+            botService.dynamicMessage.getStatisticsMessageId(chatId)?.let { messageId ->
+                botService.editMessageWithKeyboard(chatId, messageId, text)
+            }
+        }
     }
 
     data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
-        botService.checkAnswerAndSend(trainer, chatId, it, dictionary)
+        botService.checkAnswerAndSend(trainer, chatId, it)
     }
 
     document?.let { document ->
@@ -98,17 +110,23 @@ fun handleUpdate(update: Update, trainers: HashMap<Long, LearnWordsTrainer>, bot
 
             try {
                 dictionary.updateDictionaryFromFile(File(fileName))
-                botService.sendMessage(chatId, "Словарь успешно обновлен из файла $fileName")
-            } catch (e: Exception) {
-                botService.sendMessage(
+                botService.sendDynamicMessage(
                     chatId,
-                    "Ошибка при обновлении словаря из файла. Проверьте формат файла и его содержание"
+                    "Словарь успешно обновлён из файла $fileName",
+                    withBackButton = true
+                )
+
+            } catch (e: Exception) {
+                botService.sendDynamicMessage(
+                    chatId,
+                    "Ошибка при обновлении словаря. Проверьте формат файла и его содержание.",
+                    withBackButton = true
                 )
                 println("Не удалось обновить словарь из файла $fileName. Ошибка: ${e.message}")
             }
 
         } else {
-            botService.sendMessage(chatId, "Ошибка при сохранении файла")
+            botService.sendDynamicMessage(chatId, "Ошибка при сохранении файла", withBackButton = true)
         }
     }
 }

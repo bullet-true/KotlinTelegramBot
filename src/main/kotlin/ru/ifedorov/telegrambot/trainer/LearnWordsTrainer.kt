@@ -7,17 +7,18 @@ const val DEFAULT_ANSWER_OPTIONS_COUNT = 4
 
 class LearnWordsTrainer(
     private val dictionary: IUserDictionary,
+    private val chatId: Long,
+    private val username: String,
     private val answerOptionsCount: Int = DEFAULT_ANSWER_OPTIONS_COUNT,
 ) {
     private var question: Question? = null
 
-
     fun getNextQuestion(): Question? {
-        val unlearnedWords = dictionary.getUnlearnedWords()
+        val unlearnedWords = dictionary.getUnlearnedWords(chatId, username)
         if (unlearnedWords.isEmpty()) return null
 
         val questionWords = if (unlearnedWords.size < answerOptionsCount) {
-            val learnedWords = dictionary.getLearnedWords()
+            val learnedWords = dictionary.getLearnedWords(chatId, username)
             unlearnedWords.shuffled()
                 .take(answerOptionsCount) + learnedWords.take(answerOptionsCount - unlearnedWords.size)
         } else {
@@ -37,7 +38,12 @@ class LearnWordsTrainer(
         return question?.let {
             val correctAnswerIndex = it.variants.indexOf(it.correctAnswer)
             if (userAnswerInput == correctAnswerIndex) {
-                dictionary.setCorrectAnswersCount(it.correctAnswer.original, it.correctAnswer.correctAnswersCount + 1)
+                dictionary.setCorrectAnswersCount(
+                    chatId,
+                    username,
+                    it.correctAnswer.original,
+                    it.correctAnswer.correctAnswersCount + 1
+                )
                 true
             } else {
                 false
@@ -47,7 +53,7 @@ class LearnWordsTrainer(
 
     fun getStatistics(): Statistics {
         val totalCount = dictionary.getSize()
-        val learnedCount = dictionary.getNumOfLearnedWords()
+        val learnedCount = dictionary.getNumOfLearnedWords(chatId, username)
         val percent = if (totalCount > 0) (learnedCount * 100 / totalCount) else 0
         return Statistics(totalCount, learnedCount, percent)
     }
@@ -55,6 +61,6 @@ class LearnWordsTrainer(
     fun getCurrentQuestion(): Question? = question
 
     fun resetProgress() {
-        dictionary.resetUserProgress()
+        dictionary.resetUserProgress(chatId, username)
     }
 }
