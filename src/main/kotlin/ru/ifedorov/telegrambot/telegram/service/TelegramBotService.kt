@@ -112,10 +112,14 @@ class TelegramBotService(
             }
     }
 
-    fun sendMessage(chatId: Long, message: String): String {
+    fun sendMessage(chatId: Long, message: String): Long? {
         val requestBody = SendMessageRequest(chatId, message)
-        val requestBodyString = json.encodeToString<SendMessageRequest>(requestBody)
-        return postJson(sendMessageUrl, requestBodyString)
+        val requestBodyString = json.encodeToString(requestBody)
+        val responseString = postJson(sendMessageUrl, requestBodyString)
+
+        return runCatching {
+            json.decodeFromString<SendMessageResponse>(responseString).result?.messageId
+        }.getOrNull()
     }
 
     fun sendMenu(chatId: Long): String {
@@ -154,7 +158,6 @@ class TelegramBotService(
         return responseString
     }
 
-
     fun checkAnswerAndSend(trainer: LearnWordsTrainer, chatId: Long, data: String) {
         val userAnswerIndex = data.substringAfter(CALLBACK_DATA_ANSWER_PREFIX).toInt()
         val correctAnswer = trainer.getCurrentQuestion()?.correctAnswer ?: return
@@ -166,6 +169,7 @@ class TelegramBotService(
             "Неправильно!\n${correctAnswer.original} – это ${correctAnswer.translate}\n\n"
         }
 
+        sendOrUpdateStatistics(trainer, chatId)
         checkNextQuestionAndSend(trainer, chatId, resultText)
     }
 
@@ -251,6 +255,22 @@ class TelegramBotService(
         val markup = ReplyMarkup(answerButtons + menuButton)
 
         sendDynamicMessage(chatId, text, markup)
+    }
+
+    fun sendOrUpdateStatistics(trainer: LearnWordsTrainer, chatId: Long) {
+        val stats = trainer.getStatistics()
+        val text = "Выучено ${stats.learnedCount} из ${stats.totalCount} слов\n${updateProgressBar(stats.percent)}"
+
+        val existingMessageId = dynamicMessage.getStatisticsMessageId(chatId)
+
+        if (existingMessageId == null) {
+            val messageId = sendMessage(chatId, text)
+            messageId?.let { dynamicMessage.saveStatisticsMessageId(chatId, it) }
+        } else {
+            editMessageWithKeyboard(chatId, existingMessageId, text)
+        }
+
+        dynamicMessage.saveStatisticsText(chatId, text)
     }
 
     private fun deleteLastMessage(chatId: Long) {
@@ -450,5 +470,11 @@ class TelegramBotService(
         } else {
             logger.warning("file_id не найден в multipartResponse")
         }
+    }
+
+    private fun updateProgressBar(percent: Int, size: Int = 20): String {
+        val filledLength = (percent * size / 100.0).toInt()
+        val bar = "█".repeat(filledLength) + "░".repeat(size - filledLength)
+        return "[$bar] $percent%"
     }
 }

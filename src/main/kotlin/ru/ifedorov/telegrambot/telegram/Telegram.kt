@@ -61,9 +61,7 @@ fun handleUpdate(
     }
 
     if (data == STATISTICS_CALLBACK) {
-        val statistics = trainer.getStatistics()
-        val text = "Выучено ${statistics.learnedCount} из ${statistics.totalCount} слов | ${statistics.percent}%"
-        botService.sendDynamicMessage(chatId, text, withBackButton = true)
+        botService.sendOrUpdateStatistics(trainer, chatId)
     }
 
     if (data == LEARN_WORDS_CALLBACK) {
@@ -84,7 +82,17 @@ fun handleUpdate(
 
     if (data == RESET_CLICKED) {
         trainer.resetProgress()
+        botService.sendOrUpdateStatistics(trainer, chatId)
         botService.sendDynamicMessage(chatId, "Прогресс сброшен", withBackButton = true)
+    }
+
+    if (message == "/undo") {
+        val prevText = botService.dynamicMessage.undoStatisticsText(chatId)
+        prevText?.let { text ->
+            botService.dynamicMessage.getStatisticsMessageId(chatId)?.let { messageId ->
+                botService.editMessageWithKeyboard(chatId, messageId, text)
+            }
+        }
     }
 
     data?.takeIf { it.startsWith(CALLBACK_DATA_ANSWER_PREFIX) }?.let {
