@@ -106,6 +106,9 @@ class DatabaseUserDictionaryRepository(
     }
 
     override fun setCorrectAnswersCount(chatId: Long, username: String, word: String, correctAnswersCount: Int) {
+        validateInput(word, 50)
+        logSuspiciousInput(word, "setCorrectAnswersCount()")
+
         val userId = getUserId(chatId, username)
         val wordId: Int
 
@@ -165,6 +168,9 @@ class DatabaseUserDictionaryRepository(
     }
 
     fun saveImagePathForWord(wordId: Int, localPath: String) {
+        validateInput(localPath)
+        logSuspiciousInput(localPath, "saveImagePathForWord()")
+
         connection.prepareStatement(
             """
                     INSERT INTO word_images (word_id, local_path)
@@ -187,6 +193,9 @@ class DatabaseUserDictionaryRepository(
     }
 
     fun saveTelegramFileIdForWord(wordId: Int, fileId: String) {
+        validateInput(fileId)
+        logSuspiciousInput(fileId, "saveTelegramFileIdForWord() ")
+
         connection.prepareStatement(
             """
                     INSERT INTO word_images (word_id, telegram_file_id)
@@ -252,6 +261,9 @@ class DatabaseUserDictionaryRepository(
     }
 
     private fun getUserId(chatId: Long, username: String): Int {
+        validateInput(username)
+        logSuspiciousInput(username, "getUserId()")
+
         connection.prepareStatement(
             """
                     INSERT INTO users (username, chat_id, created_at) 
@@ -271,5 +283,33 @@ class DatabaseUserDictionaryRepository(
         }
 
         throw IllegalStateException("Не удалось создать пользователя")
+    }
+
+    private fun validateInput(value: String, maxLength: Int = 255): String {
+        val allowedPattern = Regex("^[a-zA-Zа-яА-Я0-9\\s._\\-/\\\\:@+=,]+$")
+        val trimmedValue = value.trim()
+
+        if (!allowedPattern.matches(trimmedValue)) {
+            throw IllegalArgumentException("Недопустимые символы в введенном значении: $value")
+        }
+        if (trimmedValue.length > maxLength) {
+            throw IllegalArgumentException("Слишком длинное веденное значение: $value")
+        }
+        return trimmedValue
+    }
+
+    private fun logSuspiciousInput(value: String, method: String) {
+        val suspiciousPatterns = listOf(
+            "'", "\"", ";", "--", "/*", "*/",
+            "union", "select", "drop", "delete", "insert", "update"
+        )
+
+        val containsSuspicious = suspiciousPatterns.any {
+            value.lowercase().contains(it)
+        }
+
+        if (containsSuspicious) {
+            logger.warning("Подозрительный ввод обнаружен в методе $method: $value")
+        }
     }
 }

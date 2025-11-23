@@ -2,7 +2,17 @@ package ru.ifedorov.telegrambot.telegram.service
 
 import kotlinx.serialization.json.Json
 import ru.ifedorov.telegrambot.data.db.DatabaseUserDictionaryRepository
-import ru.ifedorov.telegrambot.telegram.service.entity.*
+import ru.ifedorov.telegrambot.telegram.service.entity.DeleteMessageResponse
+import ru.ifedorov.telegrambot.telegram.service.entity.EditMessageRequest
+import ru.ifedorov.telegrambot.telegram.service.entity.EditMessageResponse
+import ru.ifedorov.telegrambot.telegram.service.entity.GetFileRequest
+import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
+import ru.ifedorov.telegrambot.telegram.service.entity.InlineKeyboard
+import ru.ifedorov.telegrambot.telegram.service.entity.ReplyMarkup
+import ru.ifedorov.telegrambot.telegram.service.entity.Response
+import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageRequest
+import ru.ifedorov.telegrambot.telegram.service.entity.SendMessageResponse
+import ru.ifedorov.telegrambot.telegram.service.entity.SendPhotoResponse
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import java.io.File
 import java.io.InputStream
