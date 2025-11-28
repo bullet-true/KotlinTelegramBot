@@ -7,6 +7,7 @@ import ru.ifedorov.telegrambot.telegram.service.entity.GetFileResponse
 import ru.ifedorov.telegrambot.telegram.service.entity.Update
 import ru.ifedorov.telegrambot.trainer.LearnWordsTrainer
 import java.io.File
+import java.util.logging.Logger
 
 fun main(args: Array<String>) {
     val botToken = args[0]
@@ -17,6 +18,7 @@ fun main(args: Array<String>) {
         dynamicMessage = DynamicMessage(),
         dynamicPhoto = DynamicPhoto()
     )
+    val logger = Logger.getLogger("TelegramBotMain")
     var updateId = 0L
 
     Runtime.getRuntime().addShutdownHook(Thread {
@@ -32,7 +34,12 @@ fun main(args: Array<String>) {
         val lastUpdate = response.result.lastOrNull() ?: continue
         updateId = lastUpdate.updateId + 1
 
-        handleUpdate(lastUpdate, trainers, telegramBotService)
+        try {
+            handleUpdate(lastUpdate, trainers, telegramBotService)
+        } catch (e: Exception) {
+            logger.warning("Exception: ${e.localizedMessage}")
+            e.stackTrace
+        }
     }
 }
 
@@ -119,10 +126,9 @@ fun handleUpdate(
             } catch (e: Exception) {
                 botService.sendDynamicMessage(
                     chatId,
-                    "Ошибка при обновлении словаря. Проверьте формат файла и его содержание.",
+                    "Ошибка при обновлении словаря. Проверьте формат файла $fileName и его содержимое. Ошибка: ${e.message}",
                     withBackButton = true
                 )
-                println("Не удалось обновить словарь из файла $fileName. Ошибка: ${e.message}")
             }
 
         } else {
