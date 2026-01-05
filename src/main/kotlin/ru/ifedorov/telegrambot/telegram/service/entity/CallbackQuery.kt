@@ -9,4 +9,6 @@ data class CallbackQuery(
     val data: String,
     @SerialName("message")
     val message: Message,
+    @SerialName("from")
+    val from: From? = null,
 )

@@ -53,7 +53,9 @@ fun handleUpdate(
         ?: return
 
     val dictionary = botService.dictionaryRepository
-    val username = update.message?.from?.username ?: ""
+    val username = update.message?.from?.username 
+        ?: update.callbackQuery?.from?.username 
+        ?: ""
     val message = update.message?.text
     val data = update.callbackQuery?.data
     val document = update.message?.document

@@ -286,8 +286,8 @@ class DatabaseUserDictionaryRepository(
     }
 
     private fun validateInput(value: String, maxLength: Int = 255): String {
-        val allowedPattern = Regex("^[a-zA-Zа-яА-Я0-9\\s._\\-/\\\\:@+=,]+$")
         val trimmedValue = value.trim()
+        val allowedPattern = Regex("^[a-zA-Zа-яА-Я0-9\\s._\\-/\\\\:@+=,]+$")
 
         if (!allowedPattern.matches(trimmedValue)) {
             throw IllegalArgumentException("Недопустимые символы в введенном значении: $value")
